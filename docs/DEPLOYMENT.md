@@ -22,12 +22,12 @@ Verify HTTPS, `/api/health`, registration and login, a private report submission
 
 The owner requires free services only. The former paid Render Blueprint has been removed. Do not activate paid compute, paid disks, trials that convert to paid subscriptions, or metered overages.
 
-The proposed free deployment uses Render Free for the bundled frontend/API and Supabase Free for PostgreSQL and private uploaded-file storage. This still requires replacing local media persistence with object storage and verifying PostgreSQL compatibility. The current SQLite/local-files configuration must not be deployed on Render Free: its filesystem is ephemeral and cannot preserve reports or uploads across restarts.
+The free deployment uses Render Free for the bundled frontend/API and Supabase Free for PostgreSQL and private uploaded-file storage. PostgreSQL is reached through Supabase's IPv4 shared session pooler. Files are served through the API from a private Supabase Storage bucket, so report ownership and access checks stay in RESQNET. The current local SQLite/file configuration must not be deployed on Render Free: its filesystem is ephemeral.
 
 The root Dockerfile and `backend.cloud` can serve the frontend and API from one origin. No separate frontend host or purchased domain is required. Cloud text processing uses deterministic rules unless a separately available free inference service is configured. The developer laptop's Ollama service is not cloud hosting.
 
 Free tiers have limits: Render sleeps after inactivity, and Supabase may pause inactive projects. This is a demonstration hosting option, not a continuously available emergency-response service. Stay on the free plans when quotas are reached rather than automatically upgrading.
 
-Deployment remains pending free-account access and the database/storage integration. No paid service has been activated and no live deployment URL exists yet.
+The Supabase project and private 10 MB `resqnet-private` bucket have been created on the Free organization. The runtime integration is prepared in `backend.cloud`, `backend.media`, and `render.yaml`. Deployment still needs the Supabase Postgres session connection string, a server-only storage key, and Render's GitHub authorization to be set as secrets. No paid service has been activated.
 
 References: https://render.com/docs/free and https://supabase.com/docs/guides/platform/billing-on-supabase.

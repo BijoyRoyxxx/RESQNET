@@ -189,9 +189,10 @@ def make_engine(url: str):
         path = make_url(url).database
         if path and path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
-    db_engine = create_engine(
-        url, connect_args={"check_same_thread": False} if url.startswith("sqlite") else {}
-    )
+    connect_args: dict[str, object] = {"check_same_thread": False} if url.startswith("sqlite") else {}
+    if url.startswith("postgresql+"):
+        connect_args = {"sslmode": "require", "connect_timeout": 10}
+    db_engine = create_engine(url, connect_args=connect_args, pool_size=2, max_overflow=1)
     if url.startswith("sqlite"):
 
         @event.listens_for(db_engine, "connect")

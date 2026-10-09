@@ -1,9 +1,12 @@
 import io
 import threading
 import warnings
+from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import quote
 from uuid import uuid4
 
+import httpx
 from fastapi import HTTPException, UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 
@@ -15,12 +18,53 @@ _voice_lock = threading.Lock()
 _whisper = None
 
 
+def _storage(path: str, method: str, content: bytes | None = None, mime: str | None = None) -> bytes:
+    if not settings.storage_url or not settings.storage_service_key.get_secret_value():
+        raise RuntimeError("Remote storage is not configured")
+    url = (
+        f"{settings.storage_url.rstrip('/')}/storage/v1/object/"
+        f"{quote(settings.storage_bucket, safe='')}/{quote(path, safe='/')}"
+    )
+    key = settings.storage_service_key.get_secret_value()
+    try:
+        response = httpx.request(
+            method,
+            url,
+            content=content,
+            headers={"apikey": key, "Authorization": f"Bearer {key}", **({"Content-Type": mime} if mime else {})},
+            timeout=30,
+            follow_redirects=False,
+        )
+        response.raise_for_status()
+        return response.content
+    except httpx.HTTPError:
+        raise HTTPException(503, "Private media storage is unavailable. Retry later.") from None
+
+
+def delete_media(path: str) -> None:
+    if settings.storage_url and settings.storage_service_key.get_secret_value():
+        _storage(path, "DELETE")
+    else:
+        (Path(settings.media_dir) / path).unlink(missing_ok=True)
+
+
+def read_media(path: str) -> bytes:
+    if settings.storage_url and settings.storage_service_key.get_secret_value():
+        return _storage(path, "GET")
+    try:
+        return (Path(settings.media_dir) / path).read_bytes()
+    except FileNotFoundError:
+        raise HTTPException(404, "Media file unavailable") from None
+
+
 def store_upload(file: UploadFile) -> tuple[str, str, str]:
     raw = file.file.read(MAX_UPLOAD + 1)
     if not raw or len(raw) > MAX_UPLOAD:
         raise HTTPException(413, "File must be between 1 byte and 10 MB")
     destination = Path(settings.media_dir)
-    destination.mkdir(parents=True, exist_ok=True)
+    remote = bool(settings.storage_url and settings.storage_service_key.get_secret_value())
+    if not remote:
+        destination.mkdir(parents=True, exist_ok=True)
     if file.content_type in {"image/jpeg", "image/png", "image/webp"}:
         try:
             with warnings.catch_warnings():
@@ -33,11 +77,16 @@ def store_upload(file: UploadFile) -> tuple[str, str, str]:
                 with Image.open(io.BytesIO(raw)) as original:
                     image = ImageOps.exif_transpose(original).convert("RGB")
                     image.thumbnail((2400, 2400))
-                    # A fresh pixel buffer ensures EXIF, ICC, and textual metadata are discarded.
                     clean = Image.new("RGB", image.size)
                     clean.paste(image)
-                    name = f"{uuid4()}.jpg"
-                    clean.save(destination / name, "JPEG", quality=88)
+                name = f"{uuid4()}.jpg"
+                clean_bytes = io.BytesIO()
+                # Re-encoding the clean RGB pixels discards embedded image metadata.
+                clean.save(clean_bytes, "JPEG", quality=88)
+            if remote:
+                _storage(name, "POST", clean_bytes.getvalue(), "image/jpeg")
+            else:
+                (destination / name).write_bytes(clean_bytes.getvalue())
             return name, "image/jpeg", "image"
         except (
             UnidentifiedImageError,
@@ -101,8 +150,25 @@ def store_upload(file: UploadFile) -> tuple[str, str, str]:
     except Exception:
         raise HTTPException(415, "Audio could not be decoded") from None
     name = f"{uuid4()}{suffix}"
-    (destination / name).write_bytes(raw)
+    if remote:
+        _storage(name, "POST", raw, file.content_type)
+    else:
+        (destination / name).write_bytes(raw)
     return name, file.content_type, "audio"
+
+
+@contextmanager
+def _media_path(path: str):
+    if settings.storage_url and settings.storage_service_key.get_secret_value():
+        import tempfile
+
+        suffix = Path(path).suffix
+        with tempfile.NamedTemporaryFile(suffix=suffix) as temporary:
+            temporary.write(read_media(path))
+            temporary.flush()
+            yield temporary.name
+    else:
+        yield str(Path(settings.media_dir) / path)
 
 
 def transcribe(path: str, language: str | None) -> dict:
@@ -121,9 +187,8 @@ def transcribe(path: str, language: str | None) -> dict:
     try:
         if _whisper is None:
             _whisper = WhisperModel(settings.whisper_model, device="cpu", compute_type="int8")
-        segments, info = _whisper.transcribe(
-            str(Path(settings.media_dir) / path), language=language, vad_filter=True
-        )
+        with _media_path(path) as audio_path:
+            segments, info = _whisper.transcribe(audio_path, language=language, vad_filter=True)
         transcript = " ".join(segment.text.strip() for segment in segments).strip()
         if not transcript:
             raise HTTPException(

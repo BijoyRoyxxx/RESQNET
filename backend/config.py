@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     )
     database_url: str = "sqlite:///" + (Path(__file__).resolve().parents[1] / "runtime/resq.db").as_posix()
     media_dir: str = str(Path(__file__).resolve().parents[1] / "runtime/media")
+    storage_url: str = ""
+    storage_service_key: SecretStr = SecretStr("")
+    storage_bucket: str = "resqnet-private"
     secure_cookies: bool = False
     allowed_hosts: list[str] = ["localhost", "127.0.0.1", "testserver", "backend"]
     ai_mode: Literal["auto", "rules", "ollama"] = "auto"
@@ -28,6 +31,10 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def absolute_database(cls, value):
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql+psycopg://", 1)
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+psycopg://", 1)
         if value.startswith("sqlite:///./"):
             return "sqlite:///" + (Path(__file__).resolve().parents[1] / value[12:]).as_posix()
         return value

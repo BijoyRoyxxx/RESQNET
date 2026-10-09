@@ -3,14 +3,13 @@ import importlib.util
 import logging
 from collections import Counter
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Annotated
 
 import httpx
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -34,7 +33,7 @@ from backend.db import (
     get_db,
 )
 from backend.limits import RequestSizeLimit
-from backend.media import store_upload, transcribe
+from backend.media import delete_media, read_media, store_upload, transcribe
 from backend.portal import router as portal_router
 from backend.responders import alert_dict, prepare_alert, search_services, send_alert
 from backend.schemas import (
@@ -306,7 +305,7 @@ def upload(db: DB, account: User, file: UploadFile = File(...)):
         db.add(MediaOwner(media_id=media.id, account_id=account.id))
         db.commit()
     except Exception:
-        (Path(settings.media_dir) / path).unlink(missing_ok=True)
+        delete_media(path)
         raise
     return {"id": media.id, "kind": kind, "url": f"/api/media/{media.id}"}
 
@@ -314,10 +313,7 @@ def upload(db: DB, account: User, file: UploadFile = File(...)):
 @app.get("/api/media/{media_id}")
 def media_file(media_id: str, db: DB):
     media = require(db, Media, media_id)
-    path = Path(settings.media_dir) / media.path
-    if not path.is_file():
-        raise HTTPException(404, "Media file unavailable")
-    return FileResponse(path, media_type=media.mime)
+    return Response(read_media(media.path), media_type=media.mime, headers={"Cache-Control": "private, no-store"})
 
 
 @app.post("/api/media/{media_id}/transcribe")
