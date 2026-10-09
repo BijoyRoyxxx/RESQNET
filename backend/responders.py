@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import timedelta, timezone
 from urllib.parse import urlparse
@@ -24,6 +25,8 @@ SERVICE_TAGS = {
     ],
     "medical": ['["amenity"="hospital"]["emergency"!="no"]'],
 }
+
+logger = logging.getLogger(__name__)
 
 
 def recommended_service(text: str, category: str | None = None) -> tuple[str, str]:
@@ -112,31 +115,50 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
         existing = None
     cached = existing is not None
     if existing is None:
-        center = f"around:{payload.radius_km * 1000},{payload.latitude:.6f},{payload.longitude:.6f}"
-        query = (
-            "[out:json][timeout:15][maxsize:4000000];("
-            + "".join(f"nwr{tag}({center});" for tag in SERVICE_TAGS[service])
-            + ");out center tags;"
-        )
-        try:
-            response = httpx.post(
-                settings.overpass_url,
-                data={"data": query},
-                timeout=22,
-                headers={"User-Agent": "RESQNET/1.1 local research demonstration"},
+        facilities = []
+        for search_radius in (radius for radius in (5, 10, 25, 50) if radius <= payload.radius_km):
+            center = f"around:{search_radius * 1000},{payload.latitude:.6f},{payload.longitude:.6f}"
+            # Start close and expand only when no facilities were found. This
+            # keeps common lookups small enough for public Overpass instances.
+            query = (
+                "[out:json][timeout:25];("
+                + "".join(f"nwr{tag}({center});" for tag in SERVICE_TAGS[service])
+                + ");out center tags;"
             )
-            response.raise_for_status()
-            result = response.json()
-            if result.get("remark") or not isinstance(result.get("elements"), list):
-                raise ValueError("Incomplete provider response")
-            facilities = facility_rows(
-                result["elements"], payload.latitude, payload.longitude, payload.radius_km
-            )
-        except (httpx.HTTPError, ValueError, TypeError, AttributeError):
-            raise HTTPException(
-                503,
-                "Nearby-service lookup is unavailable. No station was contacted. Retry later or use your local emergency number.",
-            ) from None
+            try:
+                response = httpx.post(
+                    settings.overpass_url,
+                    data={"data": query},
+                    timeout=40,
+                    headers={"User-Agent": "RESQNET/1.1 (+https://github.com/BijoyRoyxxx/RESQNET)"},
+                )
+                response.raise_for_status()
+                result = response.json()
+                if result.get("remark") or not isinstance(result.get("elements"), list):
+                    raise ValueError("Incomplete provider response")
+                facilities = facility_rows(
+                    result["elements"], payload.latitude, payload.longitude, search_radius
+                )
+            except httpx.HTTPStatusError as exc:
+                logger.warning("Overpass lookup failed with HTTP %s", exc.response.status_code)
+                raise HTTPException(
+                    503,
+                    "Nearby-service lookup is unavailable. No station was contacted. Retry later or use your local emergency number.",
+                ) from None
+            except httpx.HTTPError as exc:
+                logger.warning("Overpass lookup failed (%s)", type(exc).__name__)
+                raise HTTPException(
+                    503,
+                    "Nearby-service lookup is unavailable. No station was contacted. Retry later or use your local emergency number.",
+                ) from None
+            except (ValueError, TypeError, AttributeError) as exc:
+                logger.warning("Overpass returned unusable data (%s)", type(exc).__name__)
+                raise HTTPException(
+                    503,
+                    "Nearby-service lookup is unavailable. No station was contacted. Retry later or use your local emergency number.",
+                ) from None
+            if facilities:
+                break
         existing = ServiceSearch(
             latitude=payload.latitude,
             longitude=payload.longitude,

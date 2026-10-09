@@ -111,13 +111,20 @@ def test_lookup_sorts_caches_and_does_not_forward_report_text(client, monkeypatc
     assert first["facilities"][0]["distance_km"] < first["facilities"][1]["distance_km"]
     assert first["distance_method"] == "straight_line"
     assert "stolen" not in calls[0][1]["data"]["data"]
+    assert "[timeout:25]" in calls[0][1]["data"]["data"]
+    assert "[maxsize:" not in calls[0][1]["data"]["data"]
+    assert "around:5000," in calls[0][1]["data"]["data"]
+    assert calls[0][1]["timeout"] == 40
     assert search(client)["cached"] is True
     assert len(calls) == 1
 
 
 def test_empty_and_failure_are_not_fake_stations(client, monkeypatch):
-    mock_map(monkeypatch, [])
+    calls = mock_map(monkeypatch, [])
     assert search(client)["facilities"] == []
+    assert len(calls) == 2
+    assert "around:5000," in calls[0][1]["data"]["data"]
+    assert "around:10000," in calls[1][1]["data"]["data"]
 
     def offline(*args, **kwargs):
         raise httpx.ConnectError("offline")

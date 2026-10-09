@@ -85,7 +85,7 @@ class NearbyInput(BaseModel):
     service: Literal["auto", "police", "fire", "rescue", "medical"] = "auto"
     category: Category | None = None
     text: str = Field(default="", max_length=10000)
-    radius_km: Literal[5, 10, 25, 50] = 25
+    radius_km: Literal[5, 10, 25, 50] = 10
 
 
 class AlertInput(BaseModel):

@@ -116,7 +116,7 @@ export function NearbyHelp({
     report?.longitude?.toString() || initialLongitude,
   );
   const [service, setService] = useState("auto");
-  const [radius, setRadius] = useState("25");
+  const [radius, setRadius] = useState("10");
   const [result, setResult] = useState<NearbyResult>();
   const [selectedId, setSelectedId] = useState("");
   const [alerts, setAlerts] = useState<ResponderAlert[]>([]);
