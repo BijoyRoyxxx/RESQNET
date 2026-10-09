@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     storage_url: str = ""
     storage_service_key: SecretStr = SecretStr("")
     storage_bucket: str = "resqnet-private"
+    bootstrap_admin_email: str = ""
+    bootstrap_admin_password: SecretStr = SecretStr("")
+    bootstrap_admin_name: str = "RESQNET Administrator"
     secure_cookies: bool = False
     allowed_hosts: list[str] = ["localhost", "127.0.0.1", "testserver", "backend"]
     ai_mode: Literal["auto", "rules", "ollama"] = "auto"

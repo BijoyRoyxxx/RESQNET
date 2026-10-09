@@ -14,6 +14,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from backend.admin_bootstrap import bootstrap_admin
 from backend.auth import User, authorize, owned_media
 from backend.auth import router as auth_router
 from backend.config import settings
@@ -66,6 +67,7 @@ logger = logging.getLogger("resq.api")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(engine)
+    bootstrap_admin()
     yield
 
 
