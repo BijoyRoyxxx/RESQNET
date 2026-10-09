@@ -1,0 +1,122 @@
+{
+  "demo-00-0": {
+    "group": "barasat-flood",
+    "incident_type": "flood"
+  },
+  "demo-00-1": {
+    "group": "barasat-flood",
+    "incident_type": "flood"
+  },
+  "demo-00-2": {
+    "group": "barasat-flood",
+    "incident_type": "flood"
+  },
+  "demo-01-0": {
+    "group": "madhyamgram-fire",
+    "incident_type": "fire"
+  },
+  "demo-01-1": {
+    "group": "madhyamgram-fire",
+    "incident_type": "fire"
+  },
+  "demo-01-2": {
+    "group": "madhyamgram-fire",
+    "incident_type": "fire"
+  },
+  "demo-02-0": {
+    "group": "barrackpore-medical",
+    "incident_type": "medical"
+  },
+  "demo-02-1": {
+    "group": "barrackpore-medical",
+    "incident_type": "medical"
+  },
+  "demo-02-2": {
+    "group": "barrackpore-medical",
+    "incident_type": "medical"
+  },
+  "demo-03-0": {
+    "group": "dum-dum-road",
+    "incident_type": "infrastructure"
+  },
+  "demo-03-1": {
+    "group": "dum-dum-road",
+    "incident_type": "infrastructure"
+  },
+  "demo-03-2": {
+    "group": "dum-dum-road",
+    "incident_type": "infrastructure"
+  },
+  "demo-04-0": {
+    "group": "habra-flood",
+    "incident_type": "flood"
+  },
+  "demo-04-1": {
+    "group": "habra-flood",
+    "incident_type": "flood"
+  },
+  "demo-04-2": {
+    "group": "habra-flood",
+    "incident_type": "flood"
+  },
+  "demo-05-0": {
+    "group": "new-town-fire",
+    "incident_type": "fire"
+  },
+  "demo-05-1": {
+    "group": "new-town-fire",
+    "incident_type": "fire"
+  },
+  "demo-05-2": {
+    "group": "new-town-fire",
+    "incident_type": "fire"
+  },
+  "demo-06-0": {
+    "group": "bongaon-bridge",
+    "incident_type": "infrastructure"
+  },
+  "demo-06-1": {
+    "group": "bongaon-bridge",
+    "incident_type": "infrastructure"
+  },
+  "demo-06-2": {
+    "group": "bongaon-bridge",
+    "incident_type": "infrastructure"
+  },
+  "demo-07-0": {
+    "group": "howrah-medical",
+    "incident_type": "medical"
+  },
+  "demo-07-1": {
+    "group": "howrah-medical",
+    "incident_type": "medical"
+  },
+  "demo-07-2": {
+    "group": "howrah-medical",
+    "incident_type": "medical"
+  },
+  "demo-08-0": {
+    "group": "basirhat-flood",
+    "incident_type": "flood"
+  },
+  "demo-08-1": {
+    "group": "basirhat-flood",
+    "incident_type": "flood"
+  },
+  "demo-08-2": {
+    "group": "basirhat-flood",
+    "incident_type": "flood"
+  },
+  "demo-09-0": {
+    "group": "kalyani-power",
+    "incident_type": "infrastructure"
+  },
+  "demo-09-1": {
+    "group": "kalyani-power",
+    "incident_type": "infrastructure"
+  },
+  "demo-09-2": {
+    "group": "kalyani-power",
+    "incident_type": "infrastructure"
+  }
+}

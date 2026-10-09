@@ -1,0 +1,302 @@
+[
+  {
+    "source_id": "demo-00-0",
+    "text": "বন্যায় বারাসাতে 2 জন আটকে আছেন। জল বাড়ছে। উদ্ধার দরকার।",
+    "language": "auto",
+    "location_text": "Barasat",
+    "latitude": 22.7229,
+    "longitude": 88.4806,
+    "occurred_at": "2026-10-08T08:00:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-00-1",
+    "text": "Flooding near Barasat station. 2 people trapped. Water rising. Rescue requested.",
+    "language": "auto",
+    "location_text": "Barasat",
+    "latitude": 22.7232,
+    "longitude": 88.4808,
+    "occurred_at": "2026-10-08T08:03:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-00-2",
+    "text": "बारासात में बाढ़ है। 2 लोग फंसे हैं। बचाव की जरूरत है।",
+    "language": "auto",
+    "location_text": "Barasat",
+    "latitude": 22.723499999999998,
+    "longitude": 88.481,
+    "occurred_at": "2026-10-08T08:06:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-01-0",
+    "text": "Fire reported at an empty workshop in Madhyamgram. Fire service requested.",
+    "language": "auto",
+    "location_text": "Madhyamgram",
+    "latitude": 22.6939,
+    "longitude": 88.4653,
+    "occurred_at": "2026-10-08T09:00:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-01-1",
+    "text": "মধ্যমগ্রামে একটি খালি কারখানায় আগুন লেগেছে। দমকল দরকার।",
+    "language": "auto",
+    "location_text": "Madhyamgram",
+    "latitude": 22.6942,
+    "longitude": 88.4655,
+    "occurred_at": "2026-10-08T09:03:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-01-2",
+    "text": "मध्यमग्राम की खाली कार्यशाला में आग लगी है। दमकल चाहिए।",
+    "language": "auto",
+    "location_text": "Madhyamgram",
+    "latitude": 22.694499999999998,
+    "longitude": 88.4657,
+    "occurred_at": "2026-10-08T09:06:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-02-0",
+    "text": "Medical assistance requested at a shelter in Barrackpore. 3 people need an ambulance.",
+    "language": "auto",
+    "location_text": "Barrackpore",
+    "latitude": 22.7674,
+    "longitude": 88.3883,
+    "occurred_at": "2026-10-08T10:00:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-02-1",
+    "text": "ব্যারাকপুরের আশ্রয়কেন্দ্রে 3 জনের চিকিৎসা দরকার। অ্যাম্বুলেন্স চাই।",
+    "language": "auto",
+    "location_text": "Barrackpore",
+    "latitude": 22.767699999999998,
+    "longitude": 88.38850000000001,
+    "occurred_at": "2026-10-08T10:03:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-02-2",
+    "text": "बैरकपुर आश्रय में 3 लोग हैं। चिकित्सा सहायता और एम्बुलेंस चाहिए।",
+    "language": "auto",
+    "location_text": "Barrackpore",
+    "latitude": 22.767999999999997,
+    "longitude": 88.3887,
+    "occurred_at": "2026-10-08T10:06:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-03-0",
+    "text": "A road in Dum Dum is blocked by a fallen tree. Request a clearance team.",
+    "language": "auto",
+    "location_text": "Dum Dum",
+    "latitude": 22.6476,
+    "longitude": 88.4316,
+    "occurred_at": "2026-10-08T11:00:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-03-1",
+    "text": "দমদমের রাস্তায় গাছ পড়ে পথ বন্ধ। রাস্তা পরিষ্কার করা দরকার।",
+    "language": "auto",
+    "location_text": "Dum Dum",
+    "latitude": 22.6479,
+    "longitude": 88.43180000000001,
+    "occurred_at": "2026-10-08T11:03:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-03-2",
+    "text": "दमदम की सड़क पर पेड़ गिरा है। रास्ता खोलने की जरूरत है।",
+    "language": "auto",
+    "location_text": "Dum Dum",
+    "latitude": 22.6482,
+    "longitude": 88.432,
+    "occurred_at": "2026-10-08T11:06:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-04-0",
+    "text": "Floodwater has entered a Habra lane. 4 people trapped. Rescue needed.",
+    "language": "auto",
+    "location_text": "Habra",
+    "latitude": 22.8489,
+    "longitude": 88.6636,
+    "occurred_at": "2026-10-08T12:00:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-04-1",
+    "text": "হাবড়ায় বন্যার জল ঢুকেছে। 4 জন আটকে আছেন। উদ্ধার চাই।",
+    "language": "auto",
+    "location_text": "Habra",
+    "latitude": 22.8492,
+    "longitude": 88.66380000000001,
+    "occurred_at": "2026-10-08T12:03:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-04-2",
+    "text": "हाबरा में बाढ़ का पानी भर गया है। 4 लोग फंसे हैं। बचाव चाहिए।",
+    "language": "auto",
+    "location_text": "Habra",
+    "latitude": 22.8495,
+    "longitude": 88.664,
+    "occurred_at": "2026-10-08T12:06:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-05-0",
+    "text": "Fire in a fictional New Town storage shed. Nobody trapped. Fire service requested.",
+    "language": "auto",
+    "location_text": "New Town",
+    "latitude": 22.5797,
+    "longitude": 88.471,
+    "occurred_at": "2026-10-08T13:00:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-05-1",
+    "text": "নিউ টাউনের গুদামে আগুন। কেউ আটকে নেই। দমকল চাই।",
+    "language": "auto",
+    "location_text": "New Town",
+    "latitude": 22.58,
+    "longitude": 88.47120000000001,
+    "occurred_at": "2026-10-08T13:03:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-05-2",
+    "text": "न्यू टाउन के गोदाम में आग है। कोई फंसे नहीं हैं। दमकल चाहिए।",
+    "language": "auto",
+    "location_text": "New Town",
+    "latitude": 22.580299999999998,
+    "longitude": 88.4714,
+    "occurred_at": "2026-10-08T13:06:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-06-0",
+    "text": "Bridge damage reported near Bongaon. A crack is visible. Inspection requested.",
+    "language": "auto",
+    "location_text": "Bongaon",
+    "latitude": 23.044,
+    "longitude": 88.829,
+    "occurred_at": "2026-10-08T14:00:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-06-1",
+    "text": "বনগাঁর সেতুতে ফাটল দেখা গেছে। পরীক্ষা করা দরকার।",
+    "language": "auto",
+    "location_text": "Bongaon",
+    "latitude": 23.0443,
+    "longitude": 88.8292,
+    "occurred_at": "2026-10-08T14:03:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-06-2",
+    "text": "बनगांव के पुल में दरार दिखी है। निरीक्षण चाहिए।",
+    "language": "auto",
+    "location_text": "Bongaon",
+    "latitude": 23.0446,
+    "longitude": 88.82939999999999,
+    "occurred_at": "2026-10-08T14:06:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-07-0",
+    "text": "Medical help requested at a fictional Howrah shelter. 1 person needs an ambulance.",
+    "language": "auto",
+    "location_text": "Howrah",
+    "latitude": 22.5958,
+    "longitude": 88.2636,
+    "occurred_at": "2026-10-08T15:00:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-07-1",
+    "text": "হাওড়ার আশ্রয়কেন্দ্রে 1 জনের চিকিৎসা দরকার। অ্যাম্বুলেন্স চাই।",
+    "language": "auto",
+    "location_text": "Howrah",
+    "latitude": 22.5961,
+    "longitude": 88.2638,
+    "occurred_at": "2026-10-08T15:03:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-07-2",
+    "text": "हावड़ा आश्रय में 1 व्यक्ति को चिकित्सा मदद चाहिए। एम्बुलेंस चाहिए।",
+    "language": "auto",
+    "location_text": "Howrah",
+    "latitude": 22.5964,
+    "longitude": 88.264,
+    "occurred_at": "2026-10-08T15:06:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-08-0",
+    "text": "Flooding in a Basirhat lane. Water rising. Shelter requested; affected count unknown.",
+    "language": "auto",
+    "location_text": "Basirhat",
+    "latitude": 22.6574,
+    "longitude": 88.8672,
+    "occurred_at": "2026-10-08T16:00:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-08-1",
+    "text": "বসিরহাটে বন্যা। জল বাড়ছে। আশ্রয় দরকার। কতজন আছেন জানা নেই।",
+    "language": "auto",
+    "location_text": "Basirhat",
+    "latitude": 22.6577,
+    "longitude": 88.8674,
+    "occurred_at": "2026-10-08T16:03:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-08-2",
+    "text": "बशीरहाट में बाढ़ है। पानी बढ़ रहा है। आश्रय चाहिए। संख्या अज्ञात है।",
+    "language": "auto",
+    "location_text": "Basirhat",
+    "latitude": 22.657999999999998,
+    "longitude": 88.8676,
+    "occurred_at": "2026-10-08T16:06:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-09-0",
+    "text": "A damaged power line near Kalyani is hanging over the road. Utility crew requested.",
+    "language": "auto",
+    "location_text": "Kalyani",
+    "latitude": 22.9751,
+    "longitude": 88.4345,
+    "occurred_at": "2026-10-08T17:00:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-09-1",
+    "text": "কল্যাণীতে বিদ্যুতের তার রাস্তার উপরে ঝুলছে। বিদ্যুৎ কর্মী দরকার।",
+    "language": "auto",
+    "location_text": "Kalyani",
+    "latitude": 22.9754,
+    "longitude": 88.4347,
+    "occurred_at": "2026-10-08T17:03:00+05:30",
+    "synthetic": true
+  },
+  {
+    "source_id": "demo-09-2",
+    "text": "कल्याणी में बिजली का तार सड़क पर लटक रहा है। मरम्मत चाहिए।",
+    "language": "auto",
+    "location_text": "Kalyani",
+    "latitude": 22.9757,
+    "longitude": 88.4349,
+    "occurred_at": "2026-10-08T17:06:00+05:30",
+    "synthetic": true
+  }
+]
