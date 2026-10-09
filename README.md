@@ -2,6 +2,12 @@
 
 **When every second matters, turn scattered emergency reports into coordinated action.**
 
+<p align="center">
+  <a href="https://resqnet-7w72.onrender.com/">
+    <img src="https://img.shields.io/badge/OPEN%20THE%20LIVE%20APP-%E2%86%97-0b7869?style=for-the-badge&labelColor=153f3a" alt="Open the RESQNET live app" />
+  </a>
+</p>
+
 A local disaster-report workspace with separate user and administrator portals. It accepts English, Bengali and Hindi reports, preserves evidence, suggests related incidents, and gives a human reviewer the final say. This is a research demonstration, not an emergency dispatch service or validated triage system.
 
 ## What works
