@@ -77,7 +77,7 @@ app = FastAPI(
     lifespan=lifespan,
     dependencies=[Depends(authorize)],
 )
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver", "backend"])
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 app.add_middleware(RequestSizeLimit)
 app.add_middleware(
     CORSMiddleware,

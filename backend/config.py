@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///" + (Path(__file__).resolve().parents[1] / "runtime/resq.db").as_posix()
     media_dir: str = str(Path(__file__).resolve().parents[1] / "runtime/media")
     secure_cookies: bool = False
+    allowed_hosts: list[str] = ["localhost", "127.0.0.1", "testserver", "backend"]
     ai_mode: Literal["auto", "rules", "ollama"] = "auto"
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "gemma3:1b"
