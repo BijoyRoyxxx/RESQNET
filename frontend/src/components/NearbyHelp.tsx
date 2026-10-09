@@ -418,9 +418,9 @@ export function NearbyHelp({
         </div>
         <div className="nearby-search-action">
           <p>
-            Search shares these coordinates and the service type with
-            OpenStreetMap's Overpass provider. Your problem text stays on this
-            server.
+            Search sends these coordinates and the service type to VK Maps'
+            public Overpass server for OpenStreetMap data. Your problem text
+            stays on this server.
           </p>
           <Button type="button" onClick={() => void search()} disabled={!!busy}>
             {busy ? (
