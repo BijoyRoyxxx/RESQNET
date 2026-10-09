@@ -75,3 +75,10 @@ def test_bootstrap_ignores_empty_configuration(monkeypatch):
     monkeypatch.setattr(settings, "bootstrap_admin_password", SecretStr(""))
 
     assert bootstrap_admin() is False
+
+
+def test_bootstrap_waits_until_both_secrets_are_configured(monkeypatch):
+    monkeypatch.setattr(settings, "bootstrap_admin_email", "resqnet@gmail.com")
+    monkeypatch.setattr(settings, "bootstrap_admin_password", SecretStr(""))
+
+    assert bootstrap_admin() is False

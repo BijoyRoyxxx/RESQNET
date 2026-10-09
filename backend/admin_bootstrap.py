@@ -15,10 +15,8 @@ from backend.db import Account, SessionLocal
 def bootstrap_admin(session_factory: Callable[[], Session] = SessionLocal) -> bool:
     email = settings.bootstrap_admin_email.strip()
     password = settings.bootstrap_admin_password.get_secret_value()
-    if not email and not password:
-        return False
     if not email or not password:
-        raise RuntimeError("Both admin bootstrap secrets must be set")
+        return False
 
     credentials = Registration(
         email=email,
