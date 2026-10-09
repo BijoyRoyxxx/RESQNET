@@ -126,6 +126,8 @@ export function NearbyHelp({
   const [note, setNote] = useState("");
   const [consent, setConsent] = useState(false);
   const [tileError, setTileError] = useState(false);
+  const [locationLocked, setLocationLocked] = useState(false);
+  const locationLockedRef = useRef(false);
   const sequence = useRef(0);
   const searchedAutomatically = useRef(false);
   const selected = result?.facilities.find((f) => f.id === selectedId);
@@ -173,6 +175,8 @@ export function NearbyHelp({
         setError("Share your location or enter both coordinates first.");
         return;
       }
+      locationLockedRef.current = true;
+      setLocationLocked(true);
       const ticket = ++sequence.current;
       setBusy("Finding mapped services");
       try {
@@ -355,9 +359,27 @@ export function NearbyHelp({
             Using the report's saved incident location. Finding nearby services
             does not contact them.
           </p>
+        ) : locationLocked ? (
+          <div className="notice nearby-location-lock">
+            <span>
+              Location fixed for this search. Live tracking is paused so the
+              coordinates stay consistent while results load.
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                locationLockedRef.current = false;
+                setLocationLocked(false);
+              }}
+            >
+              Update live location
+            </Button>
+          </div>
         ) : (
           <LiveLocation
             onLocation={(fix) => {
+              if (locationLockedRef.current) return;
               setLatitude(fix.latitude.toFixed(6));
               setLongitude(fix.longitude.toFixed(6));
             }}

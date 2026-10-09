@@ -75,7 +75,15 @@
   gap: 16px;
   margin: 16px 0;
 }
-.nearby-stale-results .button {
+.nearby-location-lock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 16px 0;
+}
+.nearby-stale-results .button,
+.nearby-location-lock .button {
   flex: 0 0 auto;
 }
 .empty-state .text-button {
@@ -243,7 +251,8 @@
     flex-direction: column;
     align-items: stretch;
   }
-  .nearby-stale-results {
+  .nearby-stale-results,
+  .nearby-location-lock {
     align-items: stretch;
     flex-direction: column;
   }
