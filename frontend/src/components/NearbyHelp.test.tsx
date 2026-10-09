@@ -5,14 +5,14 @@ import { NearbyHelp } from "./NearbyHelp";
 
 afterEach(() => vi.unstubAllGlobals());
 
-function emptySearch(latitude: number, longitude: number) {
+function emptySearch(latitude: number, longitude: number, radius = 10) {
   return {
     id: "search-1",
     latitude,
     longitude,
     service: "police",
     facilities: [],
-    radius_km: 10,
+    radius_km: radius,
     routing_reason: "Service selected by you.",
     notice: "Map data may be incomplete.",
     cached: false,
@@ -29,7 +29,11 @@ it("offers a map search for empty coverage and hides results after location chan
     })
     .mockResolvedValueOnce({
       ok: true,
-      json: async () => emptySearch(22.8, 88.4),
+      json: async () => emptySearch(22.7, 88.4, 25),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => emptySearch(22.8, 88.4, 25),
     });
   vi.stubGlobal("fetch", fetcher);
   render(<NearbyHelp initialLatitude="22.7" initialLongitude="88.4" />);
@@ -48,6 +52,10 @@ it("offers a map search for empty coverage and hides results after location chan
     screen.getByText(/not confirmation that no service exists/i),
   ).toBeVisible();
 
+  await user.click(screen.getByRole("button", { name: "Search within 25 km" }));
+  await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+  expect(JSON.parse(fetcher.mock.calls[1][1].body).radius_km).toBe(25);
+
   await user.clear(screen.getByLabelText("Incident latitude"));
   await user.type(screen.getByLabelText("Incident latitude"), "22.8");
   expect(screen.queryByText(/No mapped police station found/)).toBeNull();
@@ -55,8 +63,8 @@ it("offers a map search for empty coverage and hides results after location chan
     screen.getByRole("button", { name: "Search with updated details" }),
   );
 
-  await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
-  expect(JSON.parse(fetcher.mock.calls[1][1].body).latitude).toBe(22.8);
+  await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
+  expect(JSON.parse(fetcher.mock.calls[2][1].body).latitude).toBe(22.8);
   expect(
     await screen.findByText(/No mapped police station found/),
   ).toBeVisible();

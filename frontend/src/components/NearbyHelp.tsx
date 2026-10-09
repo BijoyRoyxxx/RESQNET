@@ -159,80 +159,83 @@ export function NearbyHelp({
       active = false;
     };
   }, [report]);
-  const search = useCallback(async () => {
-    setError("");
-    setNote("");
-    setConsent(false);
-    if (
-      latitude.trim() === "" ||
-      longitude.trim() === "" ||
-      !Number.isFinite(Number(latitude)) ||
-      !Number.isFinite(Number(longitude))
-    ) {
-      setError("Share your location or enter both coordinates first.");
-      return;
-    }
-    const ticket = ++sequence.current;
-    setBusy("Finding mapped services");
-    try {
-      const found = await api<NearbyResult>("/services/nearby", {
-        method: "POST",
-        body: JSON.stringify({
-          latitude: Number(latitude),
-          longitude: Number(longitude),
-          text,
-          service,
-          category: category ?? report?.category,
-          radius_km: Number(radius),
-        }),
-      });
-      if (ticket !== sequence.current) return;
-      setResult(found);
-      if (found.stale)
-        setNote(
-          "Map providers are unavailable. Showing a previously saved lookup; details may have changed. Search again before preparing an alert.",
-        );
-      setSelectedId(found.facilities[0]?.id || "");
-      if (found.facilities[0]) onSelection?.(found, found.facilities[0]);
-      if (autoSearch && report && found.facilities[0] && !found.stale) {
-        try {
-          const prepared = await api<ResponderAlert>(
-            `/reports/${report.id}/alerts`,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                search_id: found.id,
-                facility_id: found.facilities[0].id,
-              }),
-            },
-          );
-          setAlerts((previous) => [
-            prepared,
-            ...previous.filter((a) => a.id !== prepared.id),
-          ]);
-        } catch (e) {
-          setError(
-            `Nearby services found, but no contact alert was prepared: ${(e as Error).message}`,
-          );
-        }
+  const search = useCallback(
+    async (searchRadius = radius) => {
+      setError("");
+      setNote("");
+      setConsent(false);
+      if (
+        latitude.trim() === "" ||
+        longitude.trim() === "" ||
+        !Number.isFinite(Number(latitude)) ||
+        !Number.isFinite(Number(longitude))
+      ) {
+        setError("Share your location or enter both coordinates first.");
+        return;
       }
-    } catch (e) {
-      setResult(undefined);
-      setError((e as Error).message);
-    } finally {
-      setBusy("");
-    }
-  }, [
-    latitude,
-    longitude,
-    text,
-    service,
-    category,
-    radius,
-    onSelection,
-    autoSearch,
-    report,
-  ]);
+      const ticket = ++sequence.current;
+      setBusy("Finding mapped services");
+      try {
+        const found = await api<NearbyResult>("/services/nearby", {
+          method: "POST",
+          body: JSON.stringify({
+            latitude: Number(latitude),
+            longitude: Number(longitude),
+            text,
+            service,
+            category: category ?? report?.category,
+            radius_km: Number(searchRadius),
+          }),
+        });
+        if (ticket !== sequence.current) return;
+        setResult(found);
+        if (found.stale)
+          setNote(
+            "Map providers are unavailable. Showing a previously saved lookup; details may have changed. Search again before preparing an alert.",
+          );
+        setSelectedId(found.facilities[0]?.id || "");
+        if (found.facilities[0]) onSelection?.(found, found.facilities[0]);
+        if (autoSearch && report && found.facilities[0] && !found.stale) {
+          try {
+            const prepared = await api<ResponderAlert>(
+              `/reports/${report.id}/alerts`,
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  search_id: found.id,
+                  facility_id: found.facilities[0].id,
+                }),
+              },
+            );
+            setAlerts((previous) => [
+              prepared,
+              ...previous.filter((a) => a.id !== prepared.id),
+            ]);
+          } catch (e) {
+            setError(
+              `Nearby services found, but no contact alert was prepared: ${(e as Error).message}`,
+            );
+          }
+        }
+      } catch (e) {
+        setResult(undefined);
+        setError((e as Error).message);
+      } finally {
+        setBusy("");
+      }
+    },
+    [
+      latitude,
+      longitude,
+      text,
+      service,
+      category,
+      radius,
+      onSelection,
+      autoSearch,
+      report,
+    ],
+  );
   useEffect(() => {
     if (!autoSearch || searchedAutomatically.current) return;
     const timer = window.setTimeout(() => {
@@ -505,6 +508,27 @@ export function NearbyHelp({
                 Check the coordinates, try a larger radius, or search another
                 map.
               </p>
+              {result.radius_km < 50 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!!busy}
+                  onClick={() => {
+                    const expandedRadius =
+                      result.radius_km < 10
+                        ? 10
+                        : result.radius_km < 25
+                          ? 25
+                          : 50;
+                    setRadius(String(expandedRadius));
+                    void search(String(expandedRadius));
+                  }}
+                >
+                  Search within{" "}
+                  {result.radius_km < 10 ? 10 : result.radius_km < 25 ? 25 : 50}{" "}
+                  km
+                </Button>
+              )}
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${result.service === "medical" ? "hospital" : result.service === "fire" ? "fire station" : result.service === "rescue" ? "rescue center" : "police station"} near ${result.latitude}, ${result.longitude}`)}`}
                 target="_blank"
