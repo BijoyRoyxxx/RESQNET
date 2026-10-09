@@ -96,3 +96,10 @@ class AlertInput(BaseModel):
 
 class SendAlertInput(BaseModel):
     consent: Literal[True]
+
+
+class DataResetInput(BaseModel):
+    """An explicit confirmation prevents an administrator from clearing records by mistake."""
+
+    model_config = ConfigDict(extra="forbid")
+    confirmation: Literal["CLEAR RESQNET DATA"]

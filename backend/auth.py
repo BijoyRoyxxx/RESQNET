@@ -81,7 +81,7 @@ def authorize(request: Request, db: DB):
     if account.role == "admin":
         return
     parts = path.strip("/").split("/")
-    if path.startswith(("/api/auth/", "/api/portal/")) or path == "/api/services/nearby":
+    if path.startswith(("/api/auth/", "/api/portal/")) or path in {"/api/live", "/api/services/nearby"}:
         return
     if path in {"/api/reports", "/api/media"} and request.method == "POST":
         return

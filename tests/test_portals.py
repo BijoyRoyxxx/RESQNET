@@ -223,3 +223,13 @@ def test_solved_case_requires_explanation_and_preserves_source_location(anonymou
     shared = client.get("/api/portal/reports").json()[0]
     assert shared["status"] == "resolved"
     assert shared["messages"][-1]["body"] == patch["body"]
+
+
+def test_admin_can_clear_operational_data_without_losing_admin_access(client, payload):
+    report = client.post("/api/reports", json=payload)
+    assert report.status_code == 201
+    response = client.request("DELETE", "/api/admin/data", json={"confirmation": "CLEAR RESQNET DATA"})
+    assert response.status_code == 200, response.text
+    assert response.json()["cleared"]["reports"] == 1
+    assert client.get("/api/reports").json() == []
+    assert client.get("/api/auth/session").json()["account"]["role"] == "admin"

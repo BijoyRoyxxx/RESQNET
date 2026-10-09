@@ -52,6 +52,16 @@ export default function PortalApp() {
       window.removeEventListener("resq-session-expired", expired);
     };
   }, []);
+  useEffect(() => {
+    if (!account) return;
+    const stream = new EventSource("/api/live", { withCredentials: true });
+    const notify = () => window.dispatchEvent(new Event("resq-live-update"));
+    stream.addEventListener("update", notify);
+    return () => {
+      stream.removeEventListener("update", notify);
+      stream.close();
+    };
+  }, [account?.id]);
   async function logout() {
     try {
       await api("/auth/logout", { method: "POST" });
@@ -331,7 +341,7 @@ function UserPortal({
           </nav>
           <p>
             Only you and authorized administrators can access your reports.
-            Updates refresh every 10 seconds while this page is open.
+            Saved updates appear here as they happen.
           </p>
         </aside>
         <main className="user-content">

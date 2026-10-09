@@ -110,18 +110,18 @@ export default function App({
   const [priority, setPriority] = useState("all");
   const [mobileNav, setMobileNav] = useState(false);
   const refreshVersion = useRef(0);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (refreshHealth = false) => {
     const version = ++refreshVersion.current;
     try {
       const [s, i, h] = await Promise.all([
         api<Summary>("/analytics/summary"),
         api<Incident[]>("/incidents"),
-        api<Health>("/health"),
+        refreshHealth ? api<Health>("/health") : Promise.resolve(undefined),
       ]);
       if (version !== refreshVersion.current) return;
       setSummary(s);
       setIncidents(i);
-      setHealth(h);
+      if (h) setHealth(h);
       setError("");
       setUpdated(new Date());
       setLoaded(true);
@@ -132,12 +132,12 @@ export default function App({
       if (version === refreshVersion.current) setRefreshing(false);
     }
   }, []);
-  // The refresh updates state only after fetching the external workspace snapshot.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 30000);
-    return () => window.clearInterval(timer);
+    void refresh(true);
+    const refreshFromLiveUpdate = () => void refresh();
+    window.addEventListener("resq-live-update", refreshFromLiveUpdate);
+    return () => window.removeEventListener("resq-live-update", refreshFromLiveUpdate);
   }, [refresh]);
   useEffect(() => {
     const changed = () => setPage(initialPage());
@@ -336,7 +336,7 @@ export default function App({
                 variant="outline"
                 onClick={() => {
                   setRefreshing(true);
-                  void refresh();
+                  void refresh(true);
                 }}
                 disabled={refreshing}
               >
@@ -809,7 +809,7 @@ export default function App({
               {updated
                 ? `Updated ${updated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
                 : "Not yet synchronized"}{" "}
-              · Refreshes every 30s
+              · Live updates
             </span>
           </footer>
         </main>

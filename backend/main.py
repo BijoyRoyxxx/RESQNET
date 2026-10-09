@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import importlib.util
 import logging
@@ -9,8 +10,8 @@ import httpx
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from sqlalchemy import func, select, text
+from fastapi.responses import JSONResponse, StreamingResponse
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.orm import Session
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -22,23 +23,29 @@ from backend.db import (
     Association,
     Audit,
     Base,
+    CaseMessage,
     Extraction,
     Incident,
+    LoginAttempt,
     Match,
     Media,
     MediaOwner,
     Report,
     ReportCase,
     ResponderAlert,
+    Review,
+    ServiceSearch,
     engine,
     get_db,
 )
 from backend.limits import RequestSizeLimit
+from backend.live import updates
 from backend.media import delete_media, read_media, store_upload, transcribe
 from backend.portal import router as portal_router
 from backend.responders import alert_dict, prepare_alert, search_services, send_alert
 from backend.schemas import (
     AlertInput,
+    DataResetInput,
     IncidentPatch,
     MergeInput,
     NearbyInput,
@@ -83,7 +90,7 @@ app.add_middleware(RequestSizeLimit)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_methods=["GET", "POST", "PATCH"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Idempotency-Key", "X-CSRF-Token"],
     allow_credentials=True,
 )
@@ -107,11 +114,71 @@ async def local_write_guard(request: Request, call_next):
                 {"error": {"code": "too_large", "message": "Request exceeds 11 MB"}}, status_code=413
             )
     response = await call_next(request)
+    if request.method in {"POST", "PATCH", "PUT", "DELETE"} and response.status_code < 400:
+        await updates.publish()
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@app.get("/api/live")
+async def live_updates(request: Request, account: User):
+    """Keep a small event stream open and let each portal refetch only after a save."""
+
+    async def events():
+        subscriber = await updates.subscribe()
+        yield "retry: 1000\nevent: ready\ndata: {}\n\n"
+        try:
+            while not await request.is_disconnected():
+                try:
+                    await asyncio.wait_for(subscriber.get(), timeout=15)
+                    yield "event: update\ndata: {}\n\n"
+                except TimeoutError:
+                    yield ": keep-alive\n\n"
+        finally:
+            await updates.unsubscribe(subscriber)
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.delete("/api/admin/data")
+def clear_operational_data(payload: DataResetInput, db: DB, account: User):
+    """Remove reports and evidence while retaining every portal account."""
+
+    if account.role != "admin":
+        raise HTTPException(403, "Administrator access required")
+
+    media = db.scalars(select(Media)).all()
+    for item in media:
+        delete_media(item.path)
+
+    deleted = {}
+    db.execute(update(Incident).values(merged_into=None))
+    for model in (
+        ResponderAlert,
+        MediaOwner,
+        CaseMessage,
+        ReportCase,
+        Association,
+        Match,
+        Extraction,
+        Media,
+        ServiceSearch,
+        Review,
+        Audit,
+        Report,
+        Incident,
+        LoginAttempt,
+    ):
+        deleted[model.__tablename__] = db.scalar(select(func.count()).select_from(model)) or 0
+        db.execute(delete(model))
+    return {"cleared": deleted, "retained": "all user and administrator accounts"}
 
 
 @app.exception_handler(HTTPException)

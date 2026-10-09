@@ -103,12 +103,13 @@ export function CaseBoard({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 10000);
+    const refreshFromLiveUpdate = () => void refresh();
+    window.addEventListener("resq-live-update", refreshFromLiveUpdate);
     if (admin)
       api<Account[]>("/admin/accounts")
         .then(setAdmins)
         .catch((e) => setError((e as Error).message));
-    return () => window.clearInterval(timer);
+    return () => window.removeEventListener("resq-live-update", refreshFromLiveUpdate);
   }, [admin, refresh]);
   const visible = cases.filter(
     (c) =>
@@ -209,7 +210,7 @@ export function CaseBoard({
       </div>
       <div className="case-sync" role="status">
         {updated
-          ? `Last checked ${updated.toLocaleTimeString()} · Refreshes every 10 seconds`
+          ? `Updated ${updated.toLocaleTimeString()} · Live updates connected`
           : "Loading cases…"}{" "}
         <span>{visible.length} shown</span>
       </div>
