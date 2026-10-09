@@ -26,8 +26,11 @@ class Settings(BaseSettings):
     match_threshold: float = 0.62
     voice_enabled: bool = False
     whisper_model: str = "small"
-    overpass_url: str = "https://overpass.private.coffee/api/interpreter"
-    overpass_fallback_urls: list[str] = ["https://overpass-api.de/api/interpreter"]
+    overpass_url: str = "https://overpass-api.de/api/interpreter"
+    overpass_fallback_urls: list[str] = [
+        "https://overpass.osm.ch/api/interpreter",
+        "https://overpass.maprva.org/api/interpreter",
+    ]
     responder_webhooks: dict[str, str] = {}
     responder_token: SecretStr = SecretStr("")
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]

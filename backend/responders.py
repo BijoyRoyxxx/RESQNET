@@ -131,15 +131,15 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
             selectors = f"({selectors});"
         query = f"[out:json][timeout:8];{selectors}out center tags;"
         facilities = None
-        providers = list(dict.fromkeys([settings.overpass_url, *settings.overpass_fallback_urls]))[:2]
+        providers = list(dict.fromkeys([settings.overpass_url, *settings.overpass_fallback_urls]))[:3]
         for provider in providers:
             with provider_lock:
                 if provider_cooldown.get(provider, 0) > time.monotonic():
                     continue
             try:
-                response = httpx.get(
+                response = httpx.post(
                     provider,
-                    params={"data": query},
+                    data={"data": query},
                     timeout=12,
                     headers={"User-Agent": "RESQNET/1.2 (+https://github.com/BijoyRoyxxx/RESQNET)"},
                 )

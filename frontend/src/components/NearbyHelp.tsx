@@ -420,9 +420,8 @@ export function NearbyHelp({
         </div>
         <div className="nearby-search-action">
           <p>
-            Search sends these coordinates and the service type to Private.coffee
-            or FOSSGIS Overpass for OpenStreetMap data. Your problem text
-            stays on this server.
+            Search sends these coordinates and the service type to public
+            OpenStreetMap data providers. Your problem text stays on this server.
           </p>
           <Button type="button" onClick={() => void search()} disabled={!!busy}>
             {busy ? (
@@ -437,6 +436,16 @@ export function NearbyHelp({
       {error && (
         <div className="error" role="alert">
           {error}
+          {error.includes("Nearby map providers are temporarily unavailable") && (
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${service === "auto" ? "emergency services" : service === "medical" ? "hospital" : service === "fire" ? "fire station" : service === "rescue" ? "rescue center" : "police station"} near ${latitude}, ${longitude}`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-button"
+            >
+              Open map search ↗
+            </a>
+          )}
         </div>
       )}
       {result && (

@@ -25,7 +25,7 @@ def test_lookup_uses_fallback_and_cools_down_failed_provider(client, monkeypatch
             return httpx.Response(429, request=httpx.Request("POST", url))
         return httpx.Response(200, json={"elements": ELEMENTS}, request=httpx.Request("POST", url))
 
-    monkeypatch.setattr("backend.responders.httpx.get", post)
+    monkeypatch.setattr("backend.responders.httpx.post", post)
     result = search(client)
     assert result["facilities"] and not result["stale"]
     assert calls == [settings.overpass_url, settings.overpass_fallback_urls[0]]
@@ -46,7 +46,7 @@ def test_lookup_returns_labelled_stale_data_without_refreshing_timestamp(client,
     def offline(*args, **kwargs):
         raise httpx.ConnectError("offline")
 
-    monkeypatch.setattr("backend.responders.httpx.get", offline)
+    monkeypatch.setattr("backend.responders.httpx.post", offline)
     second = search(client)
     assert second["id"] == first["id"]
     assert second["cached"] is True and second["stale"] is True
@@ -103,8 +103,8 @@ def test_fire_and_medical_queries_use_specific_facility_types(client, monkeypatc
         )
         assert response.status_code == 200
         assert response.json()["service"] == category
-        assert expected_tag in calls[-1][1]["params"]["data"]
-        assert '"ambulance_station"' not in calls[-1][1]["params"]["data"]
+        assert expected_tag in calls[-1][1]["data"]["data"]
+        assert '"ambulance_station"' not in calls[-1][1]["data"]["data"]
 
 
 def mock_map(monkeypatch, elements=None):
@@ -118,7 +118,7 @@ def mock_map(monkeypatch, elements=None):
             request=httpx.Request("POST", url),
         )
 
-    monkeypatch.setattr("backend.responders.httpx.get", post)
+    monkeypatch.setattr("backend.responders.httpx.post", post)
     return calls
 
 
@@ -155,10 +155,10 @@ def test_lookup_sorts_caches_and_does_not_forward_report_text(client, monkeypatc
     assert first["facilities"][0]["id"] == "node/10"
     assert first["facilities"][0]["distance_km"] < first["facilities"][1]["distance_km"]
     assert first["distance_method"] == "straight_line"
-    assert "stolen" not in calls[0][1]["params"]["data"]
-    assert "[timeout:8]" in calls[0][1]["params"]["data"]
-    assert "[maxsize:" not in calls[0][1]["params"]["data"]
-    assert "around:10000," in calls[0][1]["params"]["data"]
+    assert "stolen" not in calls[0][1]["data"]["data"]
+    assert "[timeout:8]" in calls[0][1]["data"]["data"]
+    assert "[maxsize:" not in calls[0][1]["data"]["data"]
+    assert "around:10000," in calls[0][1]["data"]["data"]
     assert calls[0][1]["timeout"] == 12
     assert search(client)["cached"] is True
     assert len(calls) == 1
@@ -168,12 +168,12 @@ def test_empty_and_failure_are_not_fake_stations(client, monkeypatch):
     calls = mock_map(monkeypatch, [])
     assert search(client)["facilities"] == []
     assert len(calls) == 1
-    assert "around:10000," in calls[0][1]["params"]["data"]
+    assert "around:10000," in calls[0][1]["data"]["data"]
 
     def offline(*args, **kwargs):
         raise httpx.ConnectError("offline")
 
-    monkeypatch.setattr("backend.responders.httpx.get", offline)
+    monkeypatch.setattr("backend.responders.httpx.post", offline)
     result = client.post("/api/services/nearby", json={"latitude": 23, "longitude": 88, "service": "rescue"})
     assert result.status_code == 503
     assert "No station was contacted" in result.json()["error"]["message"]
