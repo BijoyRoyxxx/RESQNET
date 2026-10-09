@@ -160,6 +160,11 @@ def test_image_validation_metadata_and_link(client, payload):
     assert client.post("/api/reports", json={**payload, "media_ids": [media["id"]]}).status_code == 409
 
 
+def test_response_referrer_policy_allows_map_provider_origin(client):
+    response = client.get("/api/health")
+    assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+
+
 @pytest.mark.parametrize(
     "name,content,mime,code",
     [
