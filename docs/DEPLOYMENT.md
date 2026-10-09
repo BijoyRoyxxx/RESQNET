@@ -18,4 +18,12 @@ Start with an empty database. Importing existing private reports and attachments
 
 Verify HTTPS, `/api/health`, registration and login, a private report submission, admin updates, and data surviving a backend restart. Inspect the hosting logs for database/media permission errors. Configure volume backups before relying on persisted reports.
 
-No hosting provider, account, paid plan or production domain has been selected yet. The repository is prepared for deployment but is not currently deployed.
+## Prepared Render deployment
+
+`render.yaml` defines one Docker web service in Singapore, with the 0.5 CPU / 512 MB paid plan and a 1 GB persistent disk. The root Dockerfile bundles the built frontend with FastAPI. `backend.cloud` serves both on one origin and configures the exact Render hostname automatically. No separate frontend hosting is needed. Automatic deploys are off.
+
+This is an initial small demonstration deployment. Cloud text processing starts in deterministic rules mode; local Ollama and voice transcription are not deployed. Higher traffic or AI inference needs a larger instance and separate configuration.
+
+After approving hosting charges, sign into Render and create a Blueprint from `BijoyRoyxxx/RESQNET`. Grant the GitHub integration access to this repository, review the service and disk charges, then deploy. Create the production administrator in the service shell with the command above. The site starts with an empty database.
+
+The configuration has been prepared, but no paid service has been activated and no live deployment URL exists yet.
