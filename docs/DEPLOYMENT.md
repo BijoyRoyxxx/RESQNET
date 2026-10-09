@@ -18,12 +18,16 @@ Start with an empty database. Importing existing private reports and attachments
 
 Verify HTTPS, `/api/health`, registration and login, a private report submission, admin updates, and data surviving a backend restart. Inspect the hosting logs for database/media permission errors. Configure volume backups before relying on persisted reports.
 
-## Prepared Render deployment
+## Zero-cost hosting requirement
 
-`render.yaml` defines one Docker web service in Singapore, with the 0.5 CPU / 512 MB paid plan and a 1 GB persistent disk. The root Dockerfile bundles the built frontend with FastAPI. `backend.cloud` serves both on one origin and configures the exact Render hostname automatically. No separate frontend hosting is needed. Automatic deploys are off.
+The owner requires free services only. The former paid Render Blueprint has been removed. Do not activate paid compute, paid disks, trials that convert to paid subscriptions, or metered overages.
 
-This is an initial small demonstration deployment. Cloud text processing starts in deterministic rules mode; local Ollama and voice transcription are not deployed. Higher traffic or AI inference needs a larger instance and separate configuration.
+The proposed free deployment uses Render Free for the bundled frontend/API and Supabase Free for PostgreSQL and private uploaded-file storage. This still requires replacing local media persistence with object storage and verifying PostgreSQL compatibility. The current SQLite/local-files configuration must not be deployed on Render Free: its filesystem is ephemeral and cannot preserve reports or uploads across restarts.
 
-After approving hosting charges, sign into Render and create a Blueprint from `BijoyRoyxxx/RESQNET`. Grant the GitHub integration access to this repository, review the service and disk charges, then deploy. Create the production administrator in the service shell with the command above. The site starts with an empty database.
+The root Dockerfile and `backend.cloud` can serve the frontend and API from one origin. No separate frontend host or purchased domain is required. Cloud text processing uses deterministic rules unless a separately available free inference service is configured. The developer laptop's Ollama service is not cloud hosting.
 
-The configuration has been prepared, but no paid service has been activated and no live deployment URL exists yet.
+Free tiers have limits: Render sleeps after inactivity, and Supabase may pause inactive projects. This is a demonstration hosting option, not a continuously available emergency-response service. Stay on the free plans when quotas are reached rather than automatically upgrading.
+
+Deployment remains pending free-account access and the database/storage integration. No paid service has been activated and no live deployment URL exists yet.
+
+References: https://render.com/docs/free and https://supabase.com/docs/guides/platform/billing-on-supabase.
