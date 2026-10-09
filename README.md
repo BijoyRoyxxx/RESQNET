@@ -10,6 +10,18 @@
 
 A local disaster-report workspace with separate user and administrator portals. It accepts English, Bengali and Hindi reports, preserves evidence, suggests related incidents, and gives a human reviewer the final say. This is a research demonstration, not an emergency dispatch service or validated triage system.
 
+## Deployment
+
+- **Live app:** [resqnet-7w72.onrender.com](https://resqnet-7w72.onrender.com/)
+- **Hosting:** Render free Docker web service. The React/Vite frontend is built into the same container as the FastAPI backend. Render health-checks `/api/health`.
+- **Database:** Supabase PostgreSQL, configured on Render with the secret `RESQ_DATABASE_URL`.
+- **File storage:** Supabase Storage in the private `resqnet-private` bucket.
+- **Runtime settings:** The hosted app uses deterministic `rules` extraction. Voice processing is disabled and no responder gateway is configured.
+- **Deploy updates:** Push to `main`; Render automatically builds and deploys the commit. Database URLs, storage keys and bootstrap passwords stay in Render's environment settings, never in this repository.
+- **Free-tier behavior:** Render may spin the service down while idle, so the first request after a pause can take longer.
+
+This is a research demo, not an official emergency service. Nearby lookup depends on public map providers and can be temporarily unavailable.
+
 ## What works
 
 - Private user accounts, administrator login, individual case categories, critical-first review queues, assignment, shared status updates and two-way case messages. See [portal and database guide](docs/PORTALS.md).
@@ -186,7 +198,7 @@ The web app is at `http://127.0.0.1:5173`. SQLite and media use a named volume. 
 
 ## Limits and next work
 
-- Authenticated local deployment. Public hosting, email verification, password recovery, MFA and production security review remain outside this build. Read [SECURITY.md](SECURITY.md) before changing bind addresses.
+- The public demo is deployed, but operational hardening remains unfinished: email verification, password recovery, MFA and formal security review are not configured. Read [SECURITY.md](SECURITY.md) before changing bind addresses.
 - No confirmed emergency dispatch, geocoding, external incident feeds or source-identity verification. Coordinates can come from an operator or permission-based browser location and remain unverified. Nearby-service lookup and optional authorized gateway handoff do not establish station acknowledgment or emergency response.
 - Rule extraction is intentionally narrow. Negation, spelled-out numbers, ambiguous context and complex multilingual grammar can fail. Model summaries and categories are unverified interpretations. Safety checks reduce hallucination risk, not eliminate it.
 - Voice transcription is CPU-bound and serialized. Initial model download may be slow. No Bengali/Hindi audio accuracy benchmark is claimed.
@@ -194,6 +206,6 @@ The web app is at `http://127.0.0.1:5173`. SQLite and media use a named volume. 
 - OpenStreetMap tiles need internet. Coordinates and markers still render on an empty map if tiles fail, with an explicit notice; no tiles are cached or bundled.
 - The MVP loads all incidents and up to 500 reports in the UI. Matching scans existing active incidents. Larger datasets need pagination, spatial indexing and a job queue.
 - Audit events are append-only through the API, not cryptographically tamper-proof. This upgrade adds tables without altering existing reports. Case edits use version checks; broader incident editing still needs careful operator coordination. There is no encryption at rest or automatic retention job.
-- GitHub publication, external deployment, optional vision and operational validation are deferred.
+- Optional vision and operational validation are deferred.
 
 See [API reference](docs/API.md), [three-minute demonstration](docs/DEMO.md), [contribution guide](CONTRIBUTING.md) and [third-party attribution](docs/ATTRIBUTION.md). Original code is [MIT licensed](LICENSE); third-party dependencies and models retain their own terms.

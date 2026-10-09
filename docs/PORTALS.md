@@ -35,7 +35,7 @@ Backups are timestamped in `runtime/backups/`; the command checks SQLite integri
 
 To restore: stop the backend, keep a backup of the current database and any WAL/SHM files, replace the database with a verified backup, and restore its matching media folder. Do not combine an older database with WAL/SHM files from a different snapshot. Restart the backend. `scripts.seed --reset` deletes accounts and conversations along with other records; use it only on a disposable database.
 
-Public deployment, email delivery, password recovery and actual police/rescue integrations require further setup. No external station is connected by default.
+The public demo is hosted on Render with Supabase PostgreSQL and private file storage. Email delivery, password recovery and actual police/rescue integrations require further setup. No external station is connected by default.
 
 ## Location details and solved cases
 
