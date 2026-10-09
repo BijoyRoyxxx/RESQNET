@@ -188,7 +188,10 @@ export function NearbyHelp({
       });
       if (ticket !== sequence.current) return;
       setResult(found);
-      if (found.stale) setNote("Map providers are unavailable. Showing a previously saved lookup; details may have changed. Search again before preparing an alert.");
+      if (found.stale)
+        setNote(
+          "Map providers are unavailable. Showing a previously saved lookup; details may have changed. Search again before preparing an alert.",
+        );
       setSelectedId(found.facilities[0]?.id || "");
       if (found.facilities[0]) onSelection?.(found, found.facilities[0]);
       if (autoSearch && report && found.facilities[0] && !found.stale) {
@@ -421,7 +424,8 @@ export function NearbyHelp({
         <div className="nearby-search-action">
           <p>
             Search sends these coordinates and the service type to public
-            OpenStreetMap data providers. Your problem text stays on this server.
+            OpenStreetMap data providers. Your problem text stays on this
+            server.
           </p>
           <Button type="button" onClick={() => void search()} disabled={!!busy}>
             {busy ? (
@@ -436,7 +440,9 @@ export function NearbyHelp({
       {error && (
         <div className="error" role="alert">
           {error}
-          {error.includes("Nearby map providers are temporarily unavailable") && (
+          {error.includes(
+            "Nearby map providers are temporarily unavailable",
+          ) && (
             <a
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${service === "auto" ? "emergency services" : service === "medical" ? "hospital" : service === "fire" ? "fire station" : service === "rescue" ? "rescue center" : "police station"} near ${latitude}, ${longitude}`)}`}
               target="_blank"
@@ -448,7 +454,23 @@ export function NearbyHelp({
           )}
         </div>
       )}
-      {result && (
+      {result && dirty && (
+        <div className="notice nearby-stale-results" role="status">
+          <span>
+            Your location or search settings changed. The previous results do
+            not match them, so they are hidden until you search again.
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void search()}
+            disabled={!!busy}
+          >
+            {busy ? "Searching…" : "Search with updated details"}
+          </Button>
+        </div>
+      )}
+      {result && !dirty && (
         <>
           <p className="routing-note">
             <b>
@@ -463,20 +485,34 @@ export function NearbyHelp({
             </b>{" "}
             · {result.routing_reason}
           </p>
-          {dirty && (
-            <div className="notice">
-              Location or search settings changed. Results below use the
-              previous coordinates. Search again to update distances.
-            </div>
-          )}
           {result.facilities.length === 0 ? (
             <div className="empty-state panel">
               <MapPin size={26} />
-              <h3>No mapped service found within {result.radius_km} km</h3>
+              <h3>
+                No mapped{" "}
+                {result.service === "police"
+                  ? "police station"
+                  : result.service === "medical"
+                    ? "hospital"
+                    : result.service === "fire"
+                      ? "fire station"
+                      : "rescue center"}{" "}
+                found within {result.radius_km} km
+              </h3>
               <p>
-                This does not mean no service exists. Try a larger radius or
-                another service.
+                OpenStreetMap has no matching facility mapped near this point.
+                That is a data gap, not confirmation that no service exists.
+                Check the coordinates, try a larger radius, or search another
+                map.
               </p>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${result.service === "medical" ? "hospital" : result.service === "fire" ? "fire station" : result.service === "rescue" ? "rescue center" : "police station"} near ${result.latitude}, ${result.longitude}`)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-button"
+              >
+                Search this location in Google Maps ↗
+              </a>
             </div>
           ) : (
             <div className="nearby-results">
