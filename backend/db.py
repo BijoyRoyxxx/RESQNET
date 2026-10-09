@@ -119,6 +119,9 @@ class Audit(Record, Base):
 
 class ServiceSearch(Record, Base):
     __tablename__ = "service_searches"
+    __table_args__ = (
+        Index("ix_service_search_cache", "service", "latitude", "longitude", "radius_km", "created_at"),
+    )
     latitude: Mapped[float] = mapped_column(Float)
     longitude: Mapped[float] = mapped_column(Float)
     service: Mapped[str] = mapped_column(String(20))
@@ -192,7 +195,14 @@ def make_engine(url: str):
     connect_args: dict[str, object] = {"check_same_thread": False} if url.startswith("sqlite") else {}
     if url.startswith("postgresql+"):
         connect_args = {"sslmode": "require", "connect_timeout": 10}
-    db_engine = create_engine(url, connect_args=connect_args, pool_size=2, max_overflow=1)
+    db_engine = create_engine(
+        url,
+        connect_args=connect_args,
+        pool_size=4,
+        max_overflow=2,
+        pool_pre_ping=True,
+        pool_recycle=300,
+    )
     if url.startswith("sqlite"):
 
         @event.listens_for(db_engine, "connect")

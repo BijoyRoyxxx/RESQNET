@@ -17,6 +17,8 @@ def test_bootstrap_creates_admin_once_without_storing_plaintext(tmp_path, monkey
 
     assert bootstrap_admin(sessions) is True
     assert bootstrap_admin(sessions) is False
+    monkeypatch.setattr(settings, "bootstrap_admin_password", SecretStr("stale"))
+    assert bootstrap_admin(sessions) is False
     with sessions() as db:
         account = db.scalar(select(Account).where(Account.email == "resqnet@gmail.com"))
         assert account.role == "admin"

@@ -23,11 +23,31 @@ def row(obj) -> dict:
     return {column.name: getattr(obj, column.name) for column in obj.__table__.columns}
 
 
+def report_dicts(db: Session, reports: list[Report]) -> dict[str, dict]:
+    if not reports:
+        return {}
+    ids = [r.id for r in reports]
+    attachments: dict[str, list] = {}
+    for media in db.scalars(select(Media).where(Media.report_id.in_(ids))):
+        if media.report_id is not None:
+            attachments.setdefault(media.report_id, []).append(media)
+    return {
+        report.id: serialize_report(report, case, extraction, association, attachments.get(report.id, []))
+        for report, case, extraction, association in db.execute(
+            select(Report, ReportCase, Extraction, Association)
+            .outerjoin(ReportCase, ReportCase.report_id == Report.id)
+            .outerjoin(Extraction, Extraction.report_id == Report.id)
+            .outerjoin(Association, Association.report_id == Report.id)
+            .where(Report.id.in_(ids))
+        )
+    }
+
+
 def report_dict(db: Session, report: Report) -> dict:
-    case = db.scalar(select(ReportCase).where(ReportCase.report_id == report.id))
-    extraction = db.scalar(select(Extraction).where(Extraction.report_id == report.id))
-    association = db.scalar(select(Association).where(Association.report_id == report.id))
-    media = db.scalars(select(Media).where(Media.report_id == report.id)).all()
+    return report_dicts(db, [report])[report.id]
+
+
+def serialize_report(report, case, extraction, association, media) -> dict:
     data = row(report)
     data.pop("payload_hash")
     data.pop("idempotency_key")
@@ -52,11 +72,13 @@ def incident_reports(db: Session, incident_id: str) -> list[dict]:
         .where(Association.incident_id == incident_id)
         .order_by(Report.created_at)
     ).all()
-    return [report_dict(db, r) for r in reports]
+    data = report_dicts(db, list(reports))
+    return [data[r.id] for r in reports]
 
 
-def incident_dict(db: Session, incident: Incident, detail: bool = False) -> dict:
-    reports = incident_reports(db, incident.id)
+def incident_dict(db: Session, incident: Incident, detail: bool = False, reports=None) -> dict:
+    if reports is None:
+        reports = incident_reports(db, incident.id)
     result = {
         **row(incident),
         "report_count": len(reports),

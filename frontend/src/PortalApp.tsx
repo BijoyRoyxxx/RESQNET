@@ -1,14 +1,15 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
 import { ArrowUpRight, AudioLines, Check, LogOut, ShieldCheck, X } from "lucide-react";
-import App from "./App";
 import { api, setCsrfToken } from "./api";
 import { Button } from "./components/ui/button";
-import { SubmitReport } from "./components/SubmitReport";
-import { NearbyHelp } from "./components/NearbyHelp";
-import { CaseBoard } from "./components/CaseBoard";
 import { EmergencyDirectory } from "./components/EmergencyDirectory";
 import type { Report } from "./types";
 import "./portal.css";
+
+const App = lazy(() => import("./App"));
+const SubmitReport = lazy(() => import("./components/SubmitReport").then(m => ({ default: m.SubmitReport })));
+const NearbyHelp = lazy(() => import("./components/NearbyHelp").then(m => ({ default: m.NearbyHelp })));
+const CaseBoard = lazy(() => import("./components/CaseBoard").then(m => ({ default: m.CaseBoard })));
 
 export interface Account {
   id: string;
@@ -55,13 +56,23 @@ export default function PortalApp() {
   useEffect(() => {
     if (!account) return;
     const stream = new EventSource("/api/live", { withCredentials: true });
-    const notify = () => window.dispatchEvent(new Event("resq-live-update"));
+    let timer = 0;
+    const notify = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => window.dispatchEvent(new Event("resq-live-update")), 200);
+    };
+    const visible = () => { if (!document.hidden) notify(); };
     stream.addEventListener("update", notify);
+    stream.addEventListener("ready", notify);
+    document.addEventListener("visibilitychange", visible);
     return () => {
+      window.clearTimeout(timer);
       stream.removeEventListener("update", notify);
+      stream.removeEventListener("ready", notify);
+      document.removeEventListener("visibilitychange", visible);
       stream.close();
     };
-  }, [account?.id]);
+  }, [account]);
   async function logout() {
     try {
       await api("/auth/logout", { method: "POST" });
@@ -81,6 +92,7 @@ export default function PortalApp() {
           <button onClick={() => setError("")}>Dismiss</button>
         </div>
       )}
+      <Suspense fallback={<div className="portal-loading">Opening workspace…</div>}>
       {!account ? (
         <SignIn
           onSession={(s) => {
@@ -94,6 +106,7 @@ export default function PortalApp() {
       ) : (
         <UserPortal account={account} onLogout={() => void logout()} />
       )}
+      </Suspense>
       {account?.role !== "admin" && <EmergencyDirectory />}
     </>
   );

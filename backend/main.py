@@ -61,6 +61,7 @@ from backend.service import (
     create_report,
     incident_dict,
     report_dict,
+    report_dicts,
     require,
     review,
     row,
@@ -114,7 +115,11 @@ async def local_write_guard(request: Request, call_next):
                 {"error": {"code": "too_large", "message": "Request exceeds 11 MB"}}, status_code=413
             )
     response = await call_next(request)
-    if request.method in {"POST", "PATCH", "PUT", "DELETE"} and response.status_code < 400:
+    if (
+        request.method in {"POST", "PATCH", "PUT", "DELETE"}
+        and response.status_code < 400
+        and request.url.path not in {"/api/services/nearby", "/api/auth/login", "/api/auth/logout"}
+    ):
         await updates.publish()
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -235,10 +240,9 @@ def submit_report(
 
 @app.get("/api/reports")
 def reports(db: DB, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0)):
-    return [
-        report_dict(db, r)
-        for r in db.scalars(select(Report).order_by(Report.created_at.desc()).offset(offset).limit(limit))
-    ]
+    records = list(db.scalars(select(Report).order_by(Report.created_at.desc()).offset(offset).limit(limit)))
+    data = report_dicts(db, records)
+    return [data[r.id] for r in records]
 
 
 @app.get("/api/reports/{report_id}")
@@ -262,8 +266,12 @@ def separate(report_id: str, payload: ReviewInput, db: DB):
 
 @app.get("/api/incidents")
 def incidents(db: DB):
+    all_reports = list(db.scalars(select(Report).order_by(Report.created_at)))
+    grouped: dict[str, list] = {}
+    for report in report_dicts(db, all_reports).values():
+        grouped.setdefault(report["incident_id"], []).append(report)
     return [
-        incident_dict(db, i)
+        incident_dict(db, i, reports=grouped.get(i.id, []))
         for i in db.scalars(
             select(Incident).where(Incident.merged_into.is_(None)).order_by(Incident.created_at.desc())
         )
@@ -382,7 +390,9 @@ def upload(db: DB, account: User, file: UploadFile = File(...)):
 @app.get("/api/media/{media_id}")
 def media_file(media_id: str, db: DB):
     media = require(db, Media, media_id)
-    return Response(read_media(media.path), media_type=media.mime, headers={"Cache-Control": "private, no-store"})
+    return Response(
+        read_media(media.path), media_type=media.mime, headers={"Cache-Control": "private, no-store"}
+    )
 
 
 @app.post("/api/media/{media_id}/transcribe")
@@ -412,7 +422,16 @@ def transcribe_report(report_id: str, db: DB, language: str | None = Query(None,
 
 @app.get("/api/analytics/summary")
 def analytics(db: DB):
+    return analytics_summary(db, incidents(db))
+
+
+@app.get("/api/dashboard")
+def dashboard(db: DB):
     active = incidents(db)
+    return {"incidents": active, "summary": analytics_summary(db, active)}
+
+
+def analytics_summary(db: Session, active: list):
     all_reports = db.scalars(select(Report)).all()
     times = Counter(r.created_at.strftime("%Y-%m-%d %H:00") for r in all_reports)
     engines = Counter(db.scalars(select(Extraction.engine)).all())
@@ -443,6 +462,8 @@ def health(db: DB):
     db.execute(text("SELECT 1"))
     available, reachable = False, False
     try:
+        if settings.ai_mode == "rules":
+            raise ValueError("Local model disabled")
         response = httpx.get(f"{settings.ollama_url}/api/tags", timeout=2)
         response.raise_for_status()
         reachable = True

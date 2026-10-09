@@ -25,7 +25,7 @@ services:
       - key: RESQ_VOICE_ENABLED
         value: "false"
       - key: RESQ_OVERPASS_URL
-        value: https://maps.mail.ru/osm/tools/overpass/api/interpreter
+        value: https://overpass.private.coffee/api/interpreter
       - key: RESQ_BOOTSTRAP_ADMIN_EMAIL
         value: resqnet@gmail.com
       - key: RESQ_BOOTSTRAP_ADMIN_PASSWORD

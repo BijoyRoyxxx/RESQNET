@@ -45,6 +45,7 @@ export interface NearbyResult {
   routing_reason: string;
   notice: string;
   cached: boolean;
+  stale?: boolean;
   created_at: string;
 }
 export interface ResponderAlert {
@@ -187,9 +188,10 @@ export function NearbyHelp({
       });
       if (ticket !== sequence.current) return;
       setResult(found);
+      if (found.stale) setNote("Map providers are unavailable. Showing a previously saved lookup; details may have changed. Search again before preparing an alert.");
       setSelectedId(found.facilities[0]?.id || "");
       if (found.facilities[0]) onSelection?.(found, found.facilities[0]);
-      if (autoSearch && report && found.facilities[0]) {
+      if (autoSearch && report && found.facilities[0] && !found.stale) {
         try {
           const prepared = await api<ResponderAlert>(
             `/reports/${report.id}/alerts`,
@@ -237,7 +239,7 @@ export function NearbyHelp({
     return () => window.clearTimeout(timer);
   }, [autoSearch, search]);
   async function prepare() {
-    if (!report || !result || !selected || dirty) return;
+    if (!report || !result || !selected || dirty || result.stale) return;
     setBusy("Preparing contact alert");
     setError("");
     try {
@@ -418,8 +420,8 @@ export function NearbyHelp({
         </div>
         <div className="nearby-search-action">
           <p>
-            Search sends these coordinates and the service type to VK Maps'
-            public Overpass server for OpenStreetMap data. Your problem text
+            Search sends these coordinates and the service type to Private.coffee
+            or FOSSGIS Overpass for OpenStreetMap data. Your problem text
             stays on this server.
           </p>
           <Button type="button" onClick={() => void search()} disabled={!!busy}>
@@ -611,7 +613,7 @@ export function NearbyHelp({
                             <Button
                               type="button"
                               variant="outline"
-                              disabled={!!busy || dirty}
+                              disabled={!!busy || dirty || result.stale}
                               onClick={() => void prepare()}
                             >
                               <Send size={14} />

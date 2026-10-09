@@ -113,14 +113,13 @@ export default function App({
   const refresh = useCallback(async (refreshHealth = false) => {
     const version = ++refreshVersion.current;
     try {
-      const [s, i, h] = await Promise.all([
-        api<Summary>("/analytics/summary"),
-        api<Incident[]>("/incidents"),
+      const [data, h] = await Promise.all([
+        api<{ summary: Summary; incidents: Incident[] }>("/dashboard"),
         refreshHealth ? api<Health>("/health") : Promise.resolve(undefined),
       ]);
       if (version !== refreshVersion.current) return;
-      setSummary(s);
-      setIncidents(i);
+      setSummary(data.summary);
+      setIncidents(data.incidents);
       if (h) setHealth(h);
       setError("");
       setUpdated(new Date());

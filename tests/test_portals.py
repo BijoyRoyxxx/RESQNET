@@ -8,6 +8,59 @@ from backend.db import Account, LoginSession, now
 PASSWORD = "Private report passphrase 2026"
 
 
+def test_deleted_message_author_keeps_cases_readable_without_granting_ownership(client):
+    import sqlite3
+
+    from backend.db import CaseMessage
+
+    report = client.post("/api/reports", json={"text": "Fire at station"}).json()
+    with Session(client.test_engine) as db:
+        admin = db.scalar(select(Account).where(Account.role == "admin"))
+        db.add(CaseMessage(report_id=report["id"], account_id=admin.id, body="Existing explanation"))
+        db.commit()
+    # Reproduce a dropped parent table without inventing a replacement identity.
+    with sqlite3.connect(client.test_engine.url.database) as connection:
+        connection.execute("UPDATE case_messages SET account_id='deleted-account'")
+        connection.execute("UPDATE report_cases SET account_id='deleted-account'")
+    response = client.get("/api/admin/cases")
+    assert response.status_code == 200
+    case = response.json()[0]
+    assert case["reporter"] is None
+    assert case["messages"][0]["author"] == "Deleted account"
+    assert case["messages"][0]["body"] == "Existing explanation"
+    assert case["messages"][0]["role"] == "unknown"
+    register(client)
+    assert client.get("/api/portal/reports").json() == []
+    assert client.get(f"/api/reports/{report['id']}").status_code == 404
+
+
+def test_case_and_dashboard_query_counts_stay_constant(client):
+    from sqlalchemy import event
+
+    for _ in range(12):
+        assert client.post("/api/reports", json={"text": "Medical help required"}).status_code == 201
+    queries = []
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            queries.append(statement)
+
+    event.listen(client.test_engine, "before_cursor_execute", record)
+    try:
+        response = client.get("/api/admin/cases")
+        assert response.status_code == 200
+        assert len(response.json()) == 12
+        assert len(queries) <= 9, len(queries)
+        queries.clear()
+        response = client.get("/api/dashboard")
+        assert response.status_code == 200
+        assert response.json()["summary"]["total_reports"] == 12
+        assert len(response.json()["incidents"]) == 12
+        assert len(queries) <= 12, len(queries)
+    finally:
+        event.remove(client.test_engine, "before_cursor_execute", record)
+
+
 def register(client, email="reporter@test.local"):
     client.cookies.clear()
     response = client.post(
@@ -198,12 +251,17 @@ def test_legacy_reports_stay_admin_only(client):
 def test_solved_case_requires_explanation_and_preserves_source_location(anonymous_client):
     client = anonymous_client
     register(client)
-    report = client.post("/api/reports", json={
-        "text": "Medical assistance requested near the station",
-        "category": "medical", "location_text": "Barasat station",
-        "latitude": 22.7229123, "longitude": 88.4806123,
-        "occurred_at": "2026-01-01T10:11:12+05:30",
-    }).json()
+    report = client.post(
+        "/api/reports",
+        json={
+            "text": "Medical assistance requested near the station",
+            "category": "medical",
+            "location_text": "Barasat station",
+            "latitude": 22.7229123,
+            "longitude": 88.4806123,
+            "occurred_at": "2026-01-01T10:11:12+05:30",
+        },
+    ).json()
     login_admin(client)
     patch = {"version": 1, "category": "medical", "status": "resolved", "body": "   "}
     assert client.patch(f"/api/admin/cases/{report['id']}", json=patch).status_code == 422
@@ -216,7 +274,9 @@ def test_solved_case_requires_explanation_and_preserves_source_location(anonymou
     assert persisted["report"]["longitude"] == 88.4806123
     assert persisted["report"]["location_text"] == "Barasat station"
     assert persisted["report"]["occurred_at"].removesuffix("+00:00") == "2026-01-01T04:41:12"
-    assert persisted["report"]["created_at"].removesuffix("+00:00") == report["created_at"].removesuffix("+00:00")
+    assert persisted["report"]["created_at"].removesuffix("+00:00") == report["created_at"].removesuffix(
+        "+00:00"
+    )
     assert persisted["messages"][-1]["body"] == patch["body"]
     login = client.post("/api/auth/login", json={"email": "reporter@test.local", "password": PASSWORD}).json()
     client.headers["X-CSRF-Token"] = login["csrf"]

@@ -1,6 +1,8 @@
 import logging
 import re
+import time
 from datetime import timedelta, timezone
+from threading import Lock
 from urllib.parse import urlparse
 
 import httpx
@@ -23,10 +25,12 @@ SERVICE_TAGS = {
         '["emergency"="rescue_station"]',
         '["emergency"="disaster_response"]',
     ],
-    "medical": ['["amenity"="hospital"]["emergency"!="no"]'],
+    "medical": ['["amenity"="hospital"]'],
 }
 
 logger = logging.getLogger(__name__)
+provider_lock = Lock()
+provider_cooldown: dict[str, float] = {}
 
 
 def recommended_service(text: str, category: str | None = None) -> tuple[str, str]:
@@ -71,6 +75,8 @@ def facility_rows(elements: list, lat: float, lon: float, radius: int) -> list[d
             if distance > radius:
                 continue
             tags = element.get("tags", {})
+            if tags.get("amenity") == "hospital" and tags.get("emergency") == "no":
+                continue
             if any(tags.get(k) == "yes" for k in ("disused", "abandoned")) or tags.get("access") == "no":
                 continue
             facility_id = f"{element['type']}/{int(element['id'])}"
@@ -99,7 +105,6 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
     service = suggested if payload.service == "auto" else payload.service
     if payload.service != "auto":
         reason = "Service selected by you. Results are ordered by straight-line distance."
-    # Cache an exact search for ten minutes; no raw report text is stored or sent to the map provider.
     existing = db.scalar(
         select(ServiceSearch)
         .where(
@@ -107,70 +112,78 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
             ServiceSearch.longitude == payload.longitude,
             ServiceSearch.service == service,
             ServiceSearch.radius_km == payload.radius_km,
-            ServiceSearch.created_at >= now() - timedelta(minutes=10),
+            ServiceSearch.created_at >= now() - timedelta(hours=24),
         )
         .order_by(ServiceSearch.created_at.desc())
     )
     if existing and service == "medical" and any(f.get("kind") != "hospital" for f in existing.facilities):
         existing = None
-    cached = existing is not None
-    if existing is None:
-        facilities = []
-        for search_radius in (radius for radius in (5, 10, 25, 50) if radius <= payload.radius_km):
-            center = f"around:{search_radius * 1000},{payload.latitude:.6f},{payload.longitude:.6f}"
-            # Start close and expand only when no facilities were found. This
-            # keeps common lookups small enough for public Overpass instances.
-            query = (
-                "[out:json][timeout:25];("
-                + "".join(f"nwr{tag}({center});" for tag in SERVICE_TAGS[service])
-                + ");out center tags;"
-            )
+    recent = existing is not None and existing.created_at.replace(tzinfo=timezone.utc) >= now() - timedelta(
+        minutes=10
+    )
+    cached, stale = recent, False
+    if not recent:
+        # Release the database connection while a public map server is working.
+        db.commit()
+        center = f"around:{payload.radius_km * 1000},{payload.latitude:.6f},{payload.longitude:.6f}"
+        selectors = "".join(f"nwr{tag}({center});" for tag in SERVICE_TAGS[service])
+        if len(SERVICE_TAGS[service]) > 1:
+            selectors = f"({selectors});"
+        query = f"[out:json][timeout:8];{selectors}out center tags;"
+        facilities = None
+        providers = list(dict.fromkeys([settings.overpass_url, *settings.overpass_fallback_urls]))[:2]
+        for provider in providers:
+            with provider_lock:
+                if provider_cooldown.get(provider, 0) > time.monotonic():
+                    continue
             try:
-                response = httpx.post(
-                    settings.overpass_url,
-                    data={"data": query},
-                    timeout=40,
-                    headers={"User-Agent": "RESQNET/1.1 (+https://github.com/BijoyRoyxxx/RESQNET)"},
+                response = httpx.get(
+                    provider,
+                    params={"data": query},
+                    timeout=12,
+                    headers={"User-Agent": "RESQNET/1.2 (+https://github.com/BijoyRoyxxx/RESQNET)"},
                 )
                 response.raise_for_status()
                 result = response.json()
-                if result.get("remark") or not isinstance(result.get("elements"), list):
+                if (
+                    not isinstance(result, dict)
+                    or result.get("remark")
+                    or not isinstance(result.get("elements"), list)
+                ):
                     raise ValueError("Incomplete provider response")
                 facilities = facility_rows(
-                    result["elements"], payload.latitude, payload.longitude, search_radius
+                    result["elements"], payload.latitude, payload.longitude, payload.radius_km
                 )
-            except httpx.HTTPStatusError as exc:
-                logger.warning("Overpass lookup failed with HTTP %s", exc.response.status_code)
-                raise HTTPException(
-                    503,
-                    "Nearby-service lookup is unavailable. No station was contacted. Retry later or use your local emergency number.",
-                ) from None
-            except httpx.HTTPError as exc:
-                logger.warning("Overpass lookup failed (%s)", type(exc).__name__)
-                raise HTTPException(
-                    503,
-                    "Nearby-service lookup is unavailable. No station was contacted. Retry later or use your local emergency number.",
-                ) from None
-            except (ValueError, TypeError, AttributeError) as exc:
-                logger.warning("Overpass returned unusable data (%s)", type(exc).__name__)
-                raise HTTPException(
-                    503,
-                    "Nearby-service lookup is unavailable. No station was contacted. Retry later or use your local emergency number.",
-                ) from None
-            if facilities:
                 break
-        existing = ServiceSearch(
-            latitude=payload.latitude,
-            longitude=payload.longitude,
-            service=service,
-            radius_km=payload.radius_km,
-            facilities=facilities,
-        )
-        db.add(existing)
-        db.flush()
+            except (httpx.HTTPError, ValueError, TypeError, AttributeError) as exc:
+                with provider_lock:
+                    provider_cooldown[provider] = time.monotonic() + 30
+                logger.warning(
+                    "Nearby provider %s failed (%s)", urlparse(provider).hostname, type(exc).__name__
+                )
+        if facilities is None:
+            if existing and existing.facilities:
+                cached, stale = True, True
+            else:
+                raise HTTPException(
+                    503,
+                    "Nearby map providers are temporarily unavailable. Try again shortly or open a map search. No station was contacted.",
+                )
+        else:
+            existing = ServiceSearch(
+                latitude=payload.latitude,
+                longitude=payload.longitude,
+                service=service,
+                radius_km=payload.radius_km,
+                facilities=facilities,
+            )
+            db.add(existing)
+            db.flush()
+    assert existing is not None
     return {
         **row(existing),
         "cached": cached,
+        "stale": stale,
         "suggested_service": suggested,
         "routing_reason": reason,
         "distance_method": "straight_line",

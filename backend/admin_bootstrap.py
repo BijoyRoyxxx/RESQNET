@@ -13,21 +13,21 @@ from backend.db import Account, SessionLocal
 
 
 def bootstrap_admin(session_factory: Callable[[], Session] = SessionLocal) -> bool:
-    email = settings.bootstrap_admin_email.strip()
+    email = settings.bootstrap_admin_email.strip().lower()
     password = settings.bootstrap_admin_password.get_secret_value()
     if not email or not password:
         return False
 
-    credentials = Registration(
-        email=email,
-        name=settings.bootstrap_admin_name,
-        password=password,
-    )
     with session_factory() as db:
-        account = db.scalar(select(Account).where(Account.email == credentials.email))
+        account = db.scalar(select(Account).where(Account.email == email))
+        if account and account.role == "admin":
+            return False
+        credentials = Registration(
+            email=email,
+            name=settings.bootstrap_admin_name,
+            password=password,
+        )
         if account:
-            if account.role == "admin":
-                return False
             salt = account.password_hash.split("$")[1]
             candidate = password_hash(credentials.password, salt)
             if secrets.compare_digest(candidate, account.password_hash):

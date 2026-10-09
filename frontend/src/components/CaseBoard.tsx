@@ -211,7 +211,7 @@ export function CaseBoard({
       <div className="case-sync" role="status">
         {updated
           ? `Updated ${updated.toLocaleTimeString()} · Live updates connected`
-          : "Loading cases…"}{" "}
+          : refreshing ? "Loading cases…" : error ? "Cases could not be loaded" : "Waiting for cases"}{" "}
         <span>{visible.length} shown</span>
       </div>
       {error && (

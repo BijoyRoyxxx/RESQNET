@@ -8,7 +8,7 @@ from backend.auth import DB, User, owned_report, public_account
 from backend.db import Account, CaseMessage, Report, ReportCase, now
 from backend.intelligence import priority
 from backend.schemas import Category
-from backend.service import audit, report_dict, require
+from backend.service import audit, report_dicts, require
 
 router = APIRouter(prefix="/api")
 Urgency = Literal["critical", "high", "medium", "low"]
@@ -16,8 +16,45 @@ CaseStatus = Literal["submitted", "acknowledged", "in_progress", "resolved"]
 
 
 def case_dict(db, report):
-    source = report_dict(db, report)
-    case = db.scalar(select(ReportCase).where(ReportCase.report_id == report.id))
+    return case_dicts(db, [report])[0]
+
+
+def case_dicts(db, reports):
+    if not reports:
+        return []
+    ids = [report.id for report in reports]
+    sources = report_dicts(db, reports)
+    cases = {
+        case.report_id: case for case in db.scalars(select(ReportCase).where(ReportCase.report_id.in_(ids)))
+    }
+    account_ids = {value for case in cases.values() for value in (case.account_id, case.assigned_to) if value}
+    accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_(account_ids)))}
+    messages: dict[str, list] = {}
+    for message, author in db.execute(
+        select(CaseMessage, Account)
+        .outerjoin(Account, Account.id == CaseMessage.account_id)
+        .where(CaseMessage.report_id.in_(ids))
+        .order_by(CaseMessage.created_at, CaseMessage.id)
+    ):
+        messages.setdefault(message.report_id, []).append(
+            {
+                "id": message.id,
+                "body": message.body,
+                "changes": message.changes,
+                "created_at": message.created_at,
+                "author": author.name if author else "Deleted account",
+                "role": author.role if author else "unknown",
+            }
+        )
+    return [
+        serialize_case(
+            report, sources[report.id], cases.get(report.id), accounts, messages.get(report.id, [])
+        )
+        for report in reports
+    ]
+
+
+def serialize_case(report, source, case, accounts, messages):
     ranking = priority([source], report.latitude is not None)
     category = (case.category if case else None) or source["extraction"].get("incident_type", "unknown")
     urgency = ranking["level"]
@@ -35,25 +72,8 @@ def case_dict(db, report):
     if case and case.urgency_override:
         urgency = case.urgency_override
         reasons.append("Priority set by an administrator; see case updates")
-    account = db.get(Account, case.account_id) if case and case.account_id else None
-    assigned = db.get(Account, case.assigned_to) if case and case.assigned_to else None
-    messages = []
-    for message in db.scalars(
-        select(CaseMessage)
-        .where(CaseMessage.report_id == report.id)
-        .order_by(CaseMessage.created_at, CaseMessage.id)
-    ):
-        author = require(db, Account, message.account_id)
-        messages.append(
-            {
-                "id": message.id,
-                "body": message.body,
-                "changes": message.changes,
-                "created_at": message.created_at,
-                "author": author.name,
-                "role": author.role,
-            }
-        )
+    account = accounts.get(case.account_id) if case else None
+    assigned = accounts.get(case.assigned_to) if case else None
     return {
         "report": source,
         "category": category,
@@ -77,12 +97,12 @@ def my_reports(db: DB, account: User):
         .where(ReportCase.account_id == account.id)
         .order_by(Report.created_at.desc())
     )
-    return [case_dict(db, report) for report in reports]
+    return case_dicts(db, list(reports))
 
 
 @router.get("/admin/cases")
 def cases(db: DB):
-    results = [case_dict(db, report) for report in db.scalars(select(Report).order_by(Report.created_at))]
+    results = case_dicts(db, list(db.scalars(select(Report).order_by(Report.created_at))))
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     return sorted(
         results, key=lambda c: (c["status"] == "resolved", order[c["urgency"]], c["report"]["created_at"])
