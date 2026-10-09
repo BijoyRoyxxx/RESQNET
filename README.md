@@ -4,13 +4,11 @@
 
 A local disaster-report workspace with separate user and administrator portals. It accepts English, Bengali and Hindi reports, preserves evidence, suggests related incidents, and gives a human reviewer the final say. This is a research demonstration, not an emergency dispatch service or validated triage system.
 
-![Command Center](docs/screenshots/command-center.png)
-
 ## What works
 
 - Private user accounts, administrator login, individual case categories, critical-first review queues, assignment, shared status updates and two-way case messages. See [portal and database guide](docs/PORTALS.md).
-- React operations dashboard with actual database metrics, an interactive Leaflet map, incident filters, incoming reports, activity history, analytics and service health.
-- Text reports with optional coordinates, observation time, affected-person count and requested assistance. Unknown coordinates stay unknown.
+- React operations dashboard with actual database metrics, an interactive Leaflet map, incident filters, solved cases with explanations, activity history, analytics and service health.
+- Text reports with optional coordinates, automatically recorded observation time, affected-person count and requested assistance. Unknown coordinates stay unknown.
 - Local Gemma through Ollama, schema-validated JSON and conservative checks on evidence and safety-sensitive fields. Every report records its actual extraction engine and processing time.
 - Explicit deterministic fallback for unavailable or invalid model responses, with English/Bengali/Hindi keyword support.
 - Weighted match suggestions with individual contributions. Reports always begin as separate incidents. Human approval is required for linking.
