@@ -148,6 +148,7 @@ export function SubmitReport({
             <select id="report-category" name="category">
               <option value="">Suggest from my description</option>
               <option value="crime">Crime / theft</option>
+              <option value="women_safety">Women’s safety</option>
               <option value="medical">Medical emergency</option>
               <option value="fire">Fire</option>
               <option value="flood">Flood</option>

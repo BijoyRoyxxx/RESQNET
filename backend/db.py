@@ -146,6 +146,7 @@ class Account(Record, Base):
     name: Mapped[str] = mapped_column(String(80))
     password_hash: Mapped[str] = mapped_column(String(200))
     role: Mapped[str] = mapped_column(String(10), default="user")
+    department: Mapped[str | None] = mapped_column(String(30))
 
 
 class LoginSession(Base):
@@ -166,6 +167,7 @@ class ReportCase(Record, Base):
     report_id: Mapped[str] = mapped_column(ForeignKey("reports.id"), unique=True)
     account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"), index=True)
     category: Mapped[str | None] = mapped_column(String(30))
+    department: Mapped[str | None] = mapped_column(String(30), index=True)
     immediate_danger: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(30), default="submitted")
     urgency_override: Mapped[str | None] = mapped_column(String(10))

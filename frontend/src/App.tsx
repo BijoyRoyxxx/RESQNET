@@ -37,6 +37,7 @@ import {
   HeartPulse,
   Construction,
   Server,
+  Building2,
 } from "lucide-react";
 import {
   Area,
@@ -55,6 +56,7 @@ import { IncidentMap } from "./components/IncidentMap";
 import { IncidentDetail } from "./components/IncidentDetail";
 import { Button } from "./components/ui/button";
 import { CaseBoard } from "./components/CaseBoard";
+import { DepartmentAccess } from "./components/DepartmentAccess";
 import type { Account } from "./PortalApp";
 
 const navigation = [
@@ -63,11 +65,13 @@ const navigation = [
   { id: "map", label: "Incident Map", icon: Map },
   { id: "solved", label: "Solved Cases", icon: Check },
   { id: "analytics", label: "Analytics", icon: ChartNoAxesCombined },
+  { id: "departments", label: "Department Access", icon: Building2 },
   { id: "system", label: "System Status", icon: Activity },
   { id: "about", label: "About / Open Source", icon: Github },
 ];
 const categoryIcons: Record<string, ComponentType<{ size?: number }>> = {
   flood: Waves,
+  women_safety: ShieldCheck,
   fire: Flame,
   medical: HeartPulse,
   infrastructure: Construction,
@@ -80,6 +84,7 @@ const subtitles: Record<string, string> = {
   map: "Place the reports in context.",
   solved: "Closed cases, with the explanation shared with the reporter.",
   analytics: "Patterns in the reports received.",
+  departments: "Issue department sign-ins and route cases to the right desk.",
   system: "Local services, visible limits.",
   about: "Open tools. Accountable decisions.",
 };
@@ -187,7 +192,7 @@ export default function App({
         onChange={(e) => setCategory(e.target.value)}
       >
         <option value="all">All categories</option>
-        {["flood", "fire", "medical", "infrastructure", "crime", "unknown"].map(
+        {["flood", "fire", "medical", "infrastructure", "crime", "women_safety", "unknown"].map(
           (c) => (
             <option key={c}>{c}</option>
           ),
@@ -520,6 +525,7 @@ export default function App({
               </div>
             </>
           )}
+          {loaded && page === "departments" && <DepartmentAccess />}
           {loaded && page === "map" && (
             <>
               {filters}

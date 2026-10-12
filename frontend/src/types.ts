@@ -1,5 +1,5 @@
 export type Category =
-  "flood" | "fire" | "medical" | "infrastructure" | "crime" | "unknown";
+  "flood" | "fire" | "medical" | "infrastructure" | "crime" | "women_safety" | "unknown";
 export type Level = "high" | "medium" | "low";
 export interface Extraction {
   incident_type: Category;

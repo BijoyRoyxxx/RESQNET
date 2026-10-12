@@ -2,7 +2,9 @@
 
 Open `http://127.0.0.1:5173/#user` to create a user account or sign in. The user portal provides incident submission, private case history, replies to administrators and Nearby Help. Reports are visible to their owner and authorized administrators. Other users cannot fetch them, even with a report ID or media URL.
 
-Open `http://127.0.0.1:5173/#admin` for administrator sign-in. Create an administrator from the repository root:
+Open `http://127.0.0.1:5173/#admin` for administrator sign-in. Department staff use `http://127.0.0.1:5173/#department`; an administrator must issue their account from the Department Access page. Public registration cannot create administrator or department accounts.
+
+Create an administrator from the repository root:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/create_admin.py --generate
@@ -15,7 +17,13 @@ The generated email and password are saved to `runtime/admin-credentials.txt`, e
 1. A user submits a report and optionally chooses a category or marks immediate danger. The source, extraction, provisional incident and owned case commit together.
 2. Emergency Cases lists every source report individually, including reports linked into a common incident. Filter by category, urgency, status or search text. Legacy reports remain admin-only.
 3. An administrator assigns the case, sets its category and review priority, and moves it through submitted, acknowledged, in progress and resolved. Each edit requires a shared explanation. Version checks reject stale edits with HTTP 409.
-4. The user sees those updates and can reply in the same conversation. Both views fetch saved records every ten seconds while open. This is polling, not a push notification or an external emergency alert.
+4. The user sees those updates and can reply in the same conversation. Authenticated workspaces receive a server-sent event after a successful save and then fetch saved records. This is an in-app update, not an external emergency alert.
+
+## Department routing
+
+Each case stores its owning department. A selected category routes as follows: Women’s safety to Women’s Safety; fire to Fire & Rescue; medical to Health Services; crime and unknown to Police; flood to Disaster Management; infrastructure to Municipal Services. Explicit Women’s safety wording is also checked by the deterministic classifier. Unrecognized categories default to Police.
+
+The backend filters each department case list by the signed-in account’s department. The same check applies to direct report details, evidence downloads and case edits, so hiding another department’s cases in the interface is not the access control. Department staff can read assigned reports and evidence, update status and review priority, and add a note or solved explanation. They cannot change a report’s category or reassign it. On the first desk load the next open case opens automatically; newly routed cases open in a pop-up when a live update arrives. Every department account for one department shares that department’s queue.
 
 Immediate danger explicitly declared by a reporter receives critical priority. Multiple extracted risk signals totaling at least 70 also receive critical priority. Source-supported fire/medical reports with a positive risk score receive at least high priority. Other reports retain the existing explained heuristic score. Administrators can override priority with a recorded explanation. Open cases appear before resolved cases; urgency breaks ties, then older reports come first. Synthetic reports carry a DEMO label and cannot be sent to responder gateways.
 
@@ -23,7 +31,7 @@ Case status is the progress of an individual user's report. Incident verificatio
 
 ## Permanent local storage
 
-The default database is `<repository>/runtime/resq.db`. Relative database/media paths in `.env` resolve against the repository rather than the shell's working directory. SQLite WAL and transactions are enabled. Accounts, hashed passwords, sessions, report ownership, assignments and conversations survive restarts. The portal upgrade adds tables and preserves existing report rows; it does not reset or reseed the database.
+The default database is `<repository>/runtime/resq.db`. Relative database/media paths in `.env` resolve against the repository rather than the shell's working directory. SQLite WAL and transactions are enabled. Accounts, hashed passwords, sessions, report ownership, assignments and conversations survive restarts. Startup migrations add department fields and route existing reports without resetting or reseeding the database.
 
 Create a consistent backup, including committed WAL data:
 

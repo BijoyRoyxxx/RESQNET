@@ -14,6 +14,7 @@ from backend.db import (
     Account,
     LoginAttempt,
     LoginSession,
+    Media,
     MediaOwner,
     ReportCase,
     ResponderAlert,
@@ -39,7 +40,13 @@ def token_hash(token: str) -> str:
 
 
 def public_account(account: Account):
-    return {"id": account.id, "name": account.name, "email": account.email, "role": account.role}
+    return {
+        "id": account.id,
+        "name": account.name,
+        "email": account.email,
+        "role": account.role,
+        "department": account.department,
+    }
 
 
 def current_account(request: Request, db: DB) -> Account:
@@ -63,13 +70,26 @@ User = Annotated[Account, Depends(current_account)]
 
 def owned_report(db: Session, account: Account, report_id: str):
     case = db.scalar(select(ReportCase).where(ReportCase.report_id == report_id))
-    if account.role != "admin" and (case is None or case.account_id != account.id):
+    allowed = account.role == "admin" or (
+        case is not None
+        and (
+            case.department == account.department
+            if account.role == "department"
+            else case.account_id == account.id
+        )
+    )
+    if not allowed:
         raise HTTPException(404, "Report not found")
 
 
 def owned_media(db: Session, account: Account, media_id: str):
     owner = db.get(MediaOwner, media_id)
-    if account.role != "admin" and (owner is None or owner.account_id != account.id):
+    if account.role == "department":
+        report_id = db.scalar(select(Media.report_id).where(Media.id == media_id))
+        if report_id is None:
+            raise HTTPException(404, "Attachment not found")
+        owned_report(db, account, report_id)
+    elif account.role != "admin" and (owner is None or owner.account_id != account.id):
         raise HTTPException(404, "Attachment not found")
 
 
@@ -80,6 +100,21 @@ def authorize(request: Request, db: DB):
     account = current_account(request, db)
     if account.role == "admin":
         return
+    if path.startswith("/api/auth/"):
+        return
+    if account.role == "department":
+        if path.startswith("/api/department/") and account.department:
+            return
+        if path == "/api/live":
+            return
+        parts = path.strip("/").split("/")
+        if request.method == "GET" and len(parts) == 3 and parts[1] == "reports":
+            owned_report(db, account, parts[2])
+            return
+        if request.method == "GET" and len(parts) == 3 and parts[1] == "media":
+            owned_media(db, account, parts[2])
+            return
+        raise HTTPException(403, "Department access is limited to assigned cases")
     parts = path.strip("/").split("/")
     if path.startswith(("/api/auth/", "/api/portal/")) or path in {"/api/live", "/api/services/nearby"}:
         return

@@ -12,6 +12,7 @@ import type { Report } from "../types";
 import { Button } from "./ui/button";
 import { NearbyHelp } from "./NearbyHelp";
 import { groupNearbyCases } from "./nearbyCaseGroups";
+import { departmentLabel } from "../departments";
 
 interface Message {
   id: string;
@@ -33,17 +34,20 @@ interface Case {
   reporter: Account | null;
   assigned_to: Account | null;
   messages: Message[];
+  department: string;
 }
 const categories = [
   "fire",
   "medical",
   "crime",
+  "women_safety",
   "flood",
   "infrastructure",
   "unknown",
 ];
 const categoryNames: Record<string, string> = {
   crime: "Crime / theft",
+  women_safety: "Women’s safety",
   medical: "Medical",
   fire: "Fire",
   flood: "Flood",
@@ -71,6 +75,7 @@ export function CaseBoard({
   solved?: boolean;
 }) {
   const admin = account.role === "admin";
+  const department = account.role === "department";
   const [cases, setCases] = useState<Case[]>([]);
   const [admins, setAdmins] = useState<Account[]>([]);
   const [selected, setSelected] = useState(initialSelected || "");
@@ -82,15 +87,28 @@ export function CaseBoard({
   const [updated, setUpdated] = useState<Date>();
   const [refreshing, setRefreshing] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [incoming, setIncoming] = useState<Case | null>(null);
   const refreshVersion = useRef(0);
+  const knownDepartmentCases = useRef<Set<string> | null>(null);
   const refresh = useCallback(async () => {
     const version = ++refreshVersion.current;
     setRefreshing(true);
     try {
       const result = await api<Case[]>(
-        admin ? "/admin/cases" : "/portal/reports",
+        admin ? "/admin/cases" : department ? "/department/cases" : "/portal/reports",
       );
       if (version !== refreshVersion.current) return;
+      if (department) {
+        const previous = knownDepartmentCases.current;
+        const nextCase = previous
+          ? result.find((item) => !previous.has(item.report.id) && item.status !== "resolved")
+          : result.find((item) => item.status !== "resolved");
+        if (nextCase) {
+          setSelected(nextCase.report.id);
+          setIncoming(nextCase);
+        }
+        knownDepartmentCases.current = new Set(result.map((item) => item.report.id));
+      }
       setCases(result);
       setUpdated(new Date());
       setError("");
@@ -100,7 +118,7 @@ export function CaseBoard({
     } finally {
       if (version === refreshVersion.current) setRefreshing(false);
     }
-  }, [admin]);
+  }, [admin, department]);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
@@ -129,6 +147,20 @@ export function CaseBoard({
   );
   return (
     <section className="case-board">
+      {department && incoming && (
+        <div className="department-case-backdrop">
+          <section className="department-case-popup" role="dialog" aria-modal="true" aria-labelledby="department-case-title">
+            <span className="eyebrow">NEW CASE / {departmentLabel(account.department).toUpperCase()}</span>
+            <h2 id="department-case-title">{categoryNames[incoming.category]} report assigned to your desk.</h2>
+            <p>{incoming.report.text}</p>
+            <small>{incoming.report.location_text || "Location not specified"} · {fullDate(incoming.report.created_at)}</small>
+            <div>
+              <Button onClick={() => setIncoming(null)}>Open case</Button>
+              <Button variant="ghost" onClick={() => setIncoming(null)}>Dismiss</Button>
+            </div>
+          </section>
+        </div>
+      )}
       {admin && !solved && (
         <div className="queue-ledger">
           <div>
@@ -340,6 +372,12 @@ export function CaseBoard({
                   </dd>
                 </div>
               )}
+              {admin && (
+                <div>
+                  <dt>Routed department</dt>
+                  <dd>{departmentLabel(current.department)}</dd>
+                </div>
+              )}
             </dl>
             <p className="field-hint">Location is the place and coordinates supplied with this report.</p>
             {current.status === "resolved" && (
@@ -410,7 +448,7 @@ export function CaseBoard({
                   <div>
                     <b>{m.author}</b>
                     <span>
-                      {m.role === "admin" ? "ADMIN" : "REPORTER"} ·{" "}
+                      {m.role === "admin" ? "ADMIN" : m.role === "department" ? "DEPARTMENT" : "REPORTER"} ·{" "}
                       {fullDate(m.created_at)}
                     </span>
                   </div>
@@ -422,12 +460,20 @@ export function CaseBoard({
                   ))}
                 </div>
               ))}
-              <ReplyForm
-                key={current.report.id}
-                reportId={current.report.id}
-                admin={admin}
-                onSaved={() => void refresh()}
-              />
+              {department ? (
+                <DepartmentCaseForm
+                  key={`${current.report.id}:${revision}`}
+                  item={current}
+                  onSaved={() => void refresh()}
+                />
+              ) : (
+                <ReplyForm
+                  key={current.report.id}
+                  reportId={current.report.id}
+                  admin={admin}
+                  onSaved={() => void refresh()}
+                />
+              )}
             </div>
             {!admin && <details className="case-nearby">
               <summary>
@@ -601,6 +647,71 @@ function AdminCaseForm({
       <Button type="submit" disabled={busy || version !== item.version}>
         {busy ? "Saving…" : caseStatus === "resolved" ? "Save solved case" : "Save case update"}
       </Button>
+    </form>
+  );
+}
+
+function DepartmentCaseForm({
+  item,
+  onSaved,
+}: {
+  item: Case;
+  onSaved: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    setBusy(true);
+    setError("");
+    setSaved(false);
+    try {
+      await api<Case>(`/department/cases/${item.report.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          version: item.version,
+          status: values.get("status"),
+          urgency: values.get("urgency") || null,
+          body: values.get("body"),
+        }),
+      });
+      (form.elements.namedItem("body") as HTMLTextAreaElement).value = "";
+      setSaved(true);
+      onSaved();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <form className="case-admin-form" onSubmit={submit}>
+      <span className="eyebrow">DEPARTMENT UPDATE</span>
+      <div className="case-form-grid">
+        <label>
+          Case status
+          <select name="status" defaultValue={item.status}>
+            {statuses.map((status) => <option key={status} value={status}>{status === "resolved" ? "Solved" : readable(status)}</option>)}
+          </select>
+        </label>
+        <label>
+          Review priority
+          <select name="urgency" defaultValue={item.reasons.includes("Priority set by an administrator; see case updates") ? item.urgency : ""}>
+            <option value="">Automatic / no override</option>
+            {urgencies.map((urgency) => <option key={urgency} value={urgency}>{urgency}</option>)}
+          </select>
+        </label>
+      </div>
+      <label>
+        Update or resolution explanation
+        <textarea name="body" minLength={3} maxLength={2000} required placeholder="Record what the department checked or did. Explain how a case was solved." />
+      </label>
+      {error && <div className="error" role="alert">{error}</div>}
+      {saved && <div className="notice" role="status">Department update shared with the reporter.</div>}
+      <Button type="submit" disabled={busy}>{busy ? "Saving update…" : "Save case update"}</Button>
     </form>
   );
 }

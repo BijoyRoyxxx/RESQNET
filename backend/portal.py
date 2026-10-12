@@ -3,9 +3,11 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 
-from backend.auth import DB, User, owned_report, public_account
+from backend.auth import DB, Registration, User, owned_report, password_hash, public_account
 from backend.db import Account, CaseMessage, Report, ReportCase, now
+from backend.departments import DEPARTMENT_LABELS, DepartmentName, department_for_category
 from backend.intelligence import priority
 from backend.schemas import Category
 from backend.service import audit, report_dicts, require
@@ -85,6 +87,7 @@ def serialize_case(report, source, case, accounts, messages):
         "immediate_danger": case.immediate_danger if case else False,
         "reporter": public_account(account) if account else None,
         "assigned_to": public_account(assigned) if assigned else None,
+        "department": case.department if case else department_for_category(category),
         "messages": messages,
     }
 
@@ -109,9 +112,62 @@ def cases(db: DB):
     )
 
 
+@router.get("/department/cases")
+def department_cases(db: DB, account: User):
+    if account.role != "department" or account.department not in DEPARTMENT_LABELS:
+        raise HTTPException(403, "Department sign-in required")
+    reports = db.scalars(
+        select(Report)
+        .join(ReportCase, ReportCase.report_id == Report.id)
+        .where(ReportCase.department == account.department)
+        .order_by(Report.created_at.desc())
+    )
+    results = case_dicts(db, list(reports))
+    order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    return sorted(
+        results,
+        key=lambda case: (
+            case["status"] == "resolved",
+            order[case["urgency"]],
+            case["report"]["created_at"],
+        ),
+    )
+
+
 @router.get("/admin/accounts")
 def admins(db: DB):
     return [public_account(a) for a in db.scalars(select(Account).where(Account.role == "admin"))]
+
+
+class DepartmentAccountInput(Registration):
+    department: DepartmentName
+
+
+@router.get("/admin/department-accounts")
+def department_accounts(db: DB):
+    return [
+        public_account(account)
+        for account in db.scalars(
+            select(Account).where(Account.role == "department").order_by(Account.department, Account.name)
+        )
+    ]
+
+
+@router.post("/admin/department-accounts", status_code=201)
+def create_department_account(payload: DepartmentAccountInput, db: DB):
+    account = Account(
+        email=payload.email,
+        name=payload.name,
+        password_hash=password_hash(payload.password),
+        role="department",
+        department=payload.department,
+    )
+    db.add(account)
+    try:
+        db.flush()
+    except IntegrityError:
+        raise HTTPException(409, "An account with this email already exists") from None
+    return public_account(account)
 
 
 class MessageInput(BaseModel):
@@ -137,6 +193,53 @@ class CasePatch(MessageInput):
     assigned_to: str | None = None
 
 
+class DepartmentCasePatch(MessageInput):
+    version: int = Field(ge=0)
+    status: CaseStatus
+    urgency: Urgency | None = None
+
+
+@router.patch("/department/cases/{report_id}")
+def update_department_case(report_id: str, payload: DepartmentCasePatch, db: DB, account: User):
+    if account.role != "department" or account.department not in DEPARTMENT_LABELS:
+        raise HTTPException(403, "Department sign-in required")
+    report = require(db, Report, report_id)
+    case = db.scalar(select(ReportCase).where(ReportCase.report_id == report_id))
+    if case is None or case.department != account.department:
+        raise HTTPException(404, "Case not found")
+    changes = {"status": payload.status, "urgency_override": payload.urgency}
+    before = {field: getattr(case, field) for field in changes}
+    changed = db.scalar(
+        update(ReportCase)
+        .where(
+            ReportCase.id == case.id,
+            ReportCase.department == account.department,
+            ReportCase.version == payload.version,
+        )
+        .values(**changes, version=payload.version + 1, updated_at=now())
+        .returning(ReportCase.id)
+    )
+    if changed is None:
+        raise HTTPException(409, "Another staff member updated this case. Refresh before saving.")
+    db.add(
+        CaseMessage(
+            report_id=report_id,
+            account_id=account.id,
+            body=payload.body,
+            changes={"status": payload.status, "priority": payload.urgency or "automatic"},
+        )
+    )
+    audit(
+        db,
+        "department_case_updated",
+        report_id,
+        {"department": account.department, "before": before, "after": changes},
+    )
+    db.flush()
+    db.refresh(case)
+    return case_dict(db, report)
+
+
 @router.patch("/admin/cases/{report_id}")
 def update_case(report_id: str, payload: CasePatch, db: DB, account: User):
     report = require(db, Report, report_id)
@@ -153,6 +256,7 @@ def update_case(report_id: str, payload: CasePatch, db: DB, account: User):
         db.flush()
     changes = {
         "category": payload.category,
+        "department": department_for_category(payload.category),
         "status": payload.status,
         "urgency_override": payload.urgency,
         "assigned_to": payload.assigned_to,

@@ -38,9 +38,11 @@ from backend.db import (
     engine,
     get_db,
 )
+from backend.departments import department_for_category
 from backend.limits import RequestSizeLimit
 from backend.live import updates
 from backend.media import delete_media, read_media, store_upload, transcribe
+from backend.migrations import upgrade_department_routing
 from backend.portal import router as portal_router
 from backend.responders import alert_dict, prepare_alert, search_services, send_alert
 from backend.schemas import (
@@ -75,6 +77,7 @@ logger = logging.getLogger("resq.api")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(engine)
+    upgrade_department_routing(engine)
     bootstrap_admin()
     yield
 
@@ -224,11 +227,13 @@ def submit_report(
     key = hashlib.sha256(f"{account.id}:{idempotency_key}".encode()).hexdigest() if idempotency_key else None
     report, created = create_report(db, payload, key)
     if created:
+        category = payload.category or report_dict(db, report)["extraction"].get("incident_type")
         db.add(
             ReportCase(
                 report_id=report.id,
                 account_id=account.id,
                 category=payload.category,
+                department=department_for_category(category),
                 immediate_danger=payload.immediate_danger,
             )
         )

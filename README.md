@@ -8,7 +8,7 @@
   </a>
 </p>
 
-A local disaster-report workspace with separate user and administrator portals. It accepts English, Bengali and Hindi reports, preserves evidence, suggests related incidents, and gives a human reviewer the final say. This is a research demonstration, not an emergency dispatch service or validated triage system.
+A local disaster-report workspace with user, administrator and department portals. It accepts English, Bengali and Hindi reports, preserves evidence, suggests related incidents, and gives a human reviewer the final say. This is a research demonstration, not an emergency dispatch service or validated triage system.
 
 ## Deployment
 
@@ -25,6 +25,7 @@ This is a research demo, not an official emergency service. Nearby lookup depend
 ## What works
 
 - Private user accounts, administrator login, individual case categories, critical-first review queues, assignment, shared status updates and two-way case messages. See [portal and database guide](docs/PORTALS.md).
+- Admin-issued department logins with server-enforced case routing: Women’s Safety, Fire & Rescue, Health, Police, Disaster Management and Municipal Services. Unclear categories route to Police. New assigned cases open in a live department desk; status notes and evidence remain attached to each case.
 - React operations dashboard with actual database metrics, an interactive Leaflet map, incident filters, solved cases with explanations, activity history, analytics and service health.
 - Text reports with optional coordinates, automatically recorded observation time, affected-person count and requested assistance. Unknown coordinates stay unknown.
 - Local Gemma through Ollama, schema-validated JSON and conservative checks on evidence and safety-sensitive fields. Every report records its actual extraction engine and processing time.

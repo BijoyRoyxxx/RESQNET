@@ -539,3 +539,15 @@ textarea {
 .case-resolution { padding: 18px; margin: 20px 0; background: #e5f2e9; border-left: 3px solid #087969; }
 .case-resolution p { white-space: pre-wrap; }
 .case-coordinate { font-family: monospace; overflow-wrap: anywhere; }
+
+.department-shell { background: #f7f6f0; }
+.department-content { color: #1e4942; }
+.department-access-intro,
+.department-account-form,
+.department-account-list { background: #fffef9; border-color: #cbd9d0; }
+.department-case-popup { background: #fffef8; border-color: #aac3b7; color: #233b3c; }
+.department-case-backdrop { background: #17221dcc; }
+.department-access-intro h2,
+.department-heading h1 { color: #1e4942; }
+.department-routing-list > div,
+.department-account-list article { border-color: #d9e2d9; }

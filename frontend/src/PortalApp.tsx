@@ -3,6 +3,7 @@ import { ArrowUpRight, AudioLines, Check, LogOut, ShieldCheck, X } from "lucide-
 import { api, setCsrfToken } from "./api";
 import { Button } from "./components/ui/button";
 import { EmergencyDirectory } from "./components/EmergencyDirectory";
+import { DepartmentPortal } from "./components/DepartmentPortal";
 import type { Report } from "./types";
 import "./portal.css";
 
@@ -15,7 +16,8 @@ export interface Account {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "user";
+  role: "admin" | "user" | "department";
+  department?: string | null;
 }
 interface Session {
   account: Account;
@@ -103,17 +105,20 @@ export default function PortalApp() {
         />
       ) : account.role === "admin" ? (
         <App account={account} onLogout={() => void logout()} />
+      ) : account.role === "department" ? (
+        <DepartmentPortal account={account} onLogout={() => void logout()} />
       ) : (
         <UserPortal account={account} onLogout={() => void logout()} />
       )}
       </Suspense>
-      {account?.role !== "admin" && <EmergencyDirectory />}
+      {(!account || account.role === "user") && <EmergencyDirectory />}
     </>
   );
 }
 
 function SignIn({ onSession }: { onSession: (session: Session) => void }) {
   const [admin, setAdmin] = useState(location.hash === "#admin");
+  const [department, setDepartment] = useState(location.hash === "#department");
   const [register, setRegister] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -134,7 +139,7 @@ function SignIn({ onSession }: { onSession: (session: Session) => void }) {
           }),
         },
       );
-      location.hash = result.account.role === "admin" ? "cases" : "my-reports";
+      location.hash = result.account.role === "admin" ? "cases" : result.account.role === "department" ? "department" : "my-reports";
       onSession(result);
     } catch (e) {
       setError((e as Error).message);
@@ -175,9 +180,10 @@ function SignIn({ onSession }: { onSession: (session: Session) => void }) {
       <section className="access-form-area">
         <div className="access-switch" aria-label="Choose portal">
           <button
-            className={!admin ? "active" : ""}
+            className={!admin && !department ? "active" : ""}
             onClick={() => {
               setAdmin(false);
+              setDepartment(false);
               setRegister(false);
               location.hash = "user";
             }}
@@ -185,9 +191,21 @@ function SignIn({ onSession }: { onSession: (session: Session) => void }) {
             User portal
           </button>
           <button
+            className={department ? "active" : ""}
+            onClick={() => {
+              setAdmin(false);
+              setDepartment(true);
+              setRegister(false);
+              location.hash = "department";
+            }}
+          >
+            Department login
+          </button>
+          <button
             className={admin ? "active" : ""}
             onClick={() => {
               setAdmin(true);
+              setDepartment(false);
               setRegister(false);
               location.hash = "admin";
             }}
@@ -198,17 +216,21 @@ function SignIn({ onSession }: { onSession: (session: Session) => void }) {
         <form onSubmit={submit} className="access-form">
           <ShieldCheck size={28} />
           <span className="eyebrow">
-            {admin ? "RESTRICTED WORKSPACE" : "YOUR PRIVATE REPORTS"}
+            {admin ? "RESTRICTED WORKSPACE" : department ? "DEPARTMENT SIGN-IN" : "YOUR PRIVATE REPORTS"}
           </span>
           <h2>
             {register
               ? "Open your account."
-              : admin
+              : department
+                ? "Take the desk."
+                : admin
                 ? "Take the desk."
                 : "Welcome back."}
           </h2>
           <p>
-            {admin
+            {department
+              ? "Sign in with credentials issued by your workspace administrator."
+              : admin
               ? "Review incoming cases, assign a responder from your admin team, and keep people informed."
               : "Your reports and the team’s replies stay here, including after you sign out."}
           </p>
@@ -259,7 +281,7 @@ function SignIn({ onSession }: { onSession: (session: Session) => void }) {
                 : "Sign in"}
             <ArrowUpRight size={17} />
           </Button>
-          {!admin && (
+          {!admin && !department && (
             <button
               type="button"
               className="text-link"
@@ -273,10 +295,11 @@ function SignIn({ onSession }: { onSession: (session: Session) => void }) {
                 : "New here? Create an account"}
             </button>
           )}
-          {admin && (
+          {(admin || department) && (
             <p className="access-admin-note">
-              Administrator accounts are issued by the workspace owner. Public
-              registration creates a user account.
+              {department
+                ? "Department access is issued by the workspace administrator."
+                : "Administrator accounts are issued by the workspace owner. Public registration creates a user account."}
             </p>
           )}
         </form>

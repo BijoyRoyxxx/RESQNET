@@ -3,7 +3,9 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-Category = Literal["flood", "fire", "medical", "infrastructure", "crime", "unknown"]
+Category = Literal[
+    "flood", "fire", "medical", "infrastructure", "crime", "women_safety", "unknown"
+]
 Assistance = Annotated[str, Field(min_length=1, max_length=120)]
 
 
