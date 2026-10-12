@@ -11,6 +11,7 @@ import type { Account } from "../PortalApp";
 import type { Report } from "../types";
 import { Button } from "./ui/button";
 import { NearbyHelp } from "./NearbyHelp";
+import { groupNearbyCases } from "./nearbyCaseGroups";
 
 interface Message {
   id: string;
@@ -121,6 +122,7 @@ export function CaseBoard({
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
+  const groups = admin ? groupNearbyCases(visible) : visible.map((item) => ({ cases: [item], category: item.category, latitude: item.report.latitude, longitude: item.report.longitude }));
   const current = cases.find((c) => c.report.id === selected);
   const urgent = cases.filter(
     (c) => c.status !== "resolved" && ["critical", "high"].includes(c.urgency),
@@ -136,8 +138,8 @@ export function CaseBoard({
           </div>
           <p>
             Declared immediate danger takes the first position. Priority
-            suggestions need human review. Each source report remains a separate
-            case.
+            suggestions need human review. Same-category reports within 100 m
+            are grouped visually; every source report remains a separate case.
           </p>
           <span>
             CRITICAL
@@ -212,7 +214,7 @@ export function CaseBoard({
         {updated
           ? `Updated ${updated.toLocaleTimeString()} · Live updates connected`
           : refreshing ? "Loading cases…" : error ? "Cases could not be loaded" : "Waiting for cases"}{" "}
-        <span>{visible.length} shown</span>
+        <span>{admin ? `${visible.length} reports · ${groups.length} groups` : `${visible.length} shown`}</span>
       </div>
       {error && (
         <div role="alert" className="error">
@@ -228,42 +230,59 @@ export function CaseBoard({
                 : "No reports yet. Your first report will appear here."}
             </div>
           )}
-          {visible.map((item) => (
-            <button
-              key={item.report.id}
-              className={`case-row ${selected === item.report.id ? "selected" : ""}`}
-              onClick={() => {
-                setSelected(item.report.id);
-                setRevision(0);
-              }}
-            >
-              <div className="case-row-top">
-                <span className={`urgency urgency-${item.urgency}`}>
-                  {item.urgency}
-                </span>
-                <span>{categoryNames[item.category]}</span>
-                <small>{shortId(item.report.id)}</small>
+          {groups.map((group) => (
+            <div className={`case-location-group ${group.cases.length > 1 ? "is-cluster" : ""}`} key={group.cases[0].report.id}>
+              {group.cases.length > 1 && (
+                <div className="case-location-group-head">
+                  <div>
+                    <span className="eyebrow">NEARBY REPORTS / {categoryNames[group.category]}</span>
+                    <strong>{group.cases.length} reports within 100 m of the first report</strong>
+                    <small>{group.cases[0].report.location_text || (group.latitude != null && group.longitude != null
+                      ? `${group.latitude}, ${group.longitude}` : "Location not specified")}</small>
+                  </div>
+                  <span>Separate case records</span>
+                </div>
+              )}
+              <div className="case-location-group-reports">
+                {group.cases.map((item) => (
+                  <button
+                    key={item.report.id}
+                    className={`case-row ${selected === item.report.id ? "selected" : ""}`}
+                    onClick={() => {
+                      setSelected(item.report.id);
+                      setRevision(0);
+                    }}
+                  >
+                    <div className="case-row-top">
+                      <span className={`urgency urgency-${item.urgency}`}>
+                        {item.urgency}
+                      </span>
+                      <span>{categoryNames[item.category]}</span>
+                      <small>{shortId(item.report.id)}</small>
+                    </div>
+                    <h3>{item.report.text}</h3>
+                    <p>
+                      <MapPin size={12} />
+                      {item.report.location_text || "Location not specified"}
+                    </p>
+                    <p className="case-coordinate">
+                      Coordinates: {item.report.latitude != null && item.report.longitude != null
+                        ? `${item.report.latitude}, ${item.report.longitude}` : "Not supplied"}
+                    </p>
+                    <p>Reported: {fullDate(item.report.created_at)}</p>
+                    <div className="case-row-bottom">
+                      <span>{item.status === "resolved" ? "Solved" : readable(item.status)}</span>
+                      {item.report.synthetic && <span>DEMO</span>}
+                      <span>
+                        <MessageSquare size={12} />
+                        {item.messages.length}
+                      </span>
+                      <ArrowUpRight size={15} />
+                    </div>
+                  </button>
+                ))}
               </div>
-              <h3>{item.report.text}</h3>
-              <p>
-                <MapPin size={12} />
-                {item.report.location_text || "Location not specified"}
-              </p>
-              <p className="case-coordinate">
-                Coordinates: {item.report.latitude != null && item.report.longitude != null
-                  ? `${item.report.latitude}, ${item.report.longitude}` : "Not supplied"}
-              </p>
-              <p>Reported: {fullDate(item.report.created_at)}</p>
-              <div className="case-row-bottom">
-                <span>{item.status === "resolved" ? "Solved" : readable(item.status)}</span>
-                {item.report.synthetic && <span>DEMO</span>}
-                <span>
-                  <MessageSquare size={12} />
-                  {item.messages.length}
-                </span>
-                <ArrowUpRight size={15} />
-              </div>
-            </button>
+            </div>
           ))}
         </div>
         {current && (
