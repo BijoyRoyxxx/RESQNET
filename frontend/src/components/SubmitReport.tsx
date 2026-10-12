@@ -195,9 +195,9 @@ export function SubmitReport({
             <strong>Add supporting image</strong>
             <span>JPEG, PNG, WebP · 10 MB</span>
             <input
-              aria-label="Upload supporting image"
+              aria-label="Upload supporting image or video"
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,video/webm"
               disabled={!!busy}
               onChange={(e) => void upload(e.target.files?.[0])}
             />
@@ -209,6 +209,8 @@ export function SubmitReport({
               <div key={m.id}>
                 {m.kind === "image" ? (
                   <img src={m.url} alt="Uploaded report evidence" />
+                ) : m.kind === "video" ? (
+                  <video src={m.url} controls playsInline aria-label="Uploaded report video" />
                 ) : (
                   <audio src={m.url} controls />
                 )}

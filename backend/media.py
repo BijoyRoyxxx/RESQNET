@@ -126,35 +126,44 @@ def store_upload(file: UploadFile) -> tuple[str, str, str]:
         suffix = ".flac"
     if suffix is None:
         raise HTTPException(415, "Audio file signature does not match an allowed format")
-    # Decode with PyAV to verify container, stream and duration, independent of speech inference.
+    is_video = file.content_type.startswith("video/")
+    # Decode with PyAV to verify the recorded container, stream and duration.
     try:
         import av
     except ImportError:
         raise HTTPException(
             503,
-            "Audio validation requires the optional voice dependencies. Install backend/requirements-voice.txt.",
+            "Media validation requires the optional voice dependencies. Install backend/requirements-voice.txt.",
         ) from None
     try:
         with av.open(io.BytesIO(raw), mode="r") as container:
-            if not container.streams.audio:
-                raise ValueError("No audio stream")
-            duration = 0.0
-            for frame in container.decode(audio=0):
-                duration += frame.samples / frame.sample_rate
-                if duration > 180:
-                    raise HTTPException(413, "Audio must be no longer than three minutes")
-            if duration == 0:
-                raise ValueError("Empty audio")
+            if is_video:
+                if not container.streams.video:
+                    raise ValueError("No video stream")
+                stream = container.streams.video[0]
+                if stream.duration is not None and stream.time_base is not None:
+                    if float(stream.duration * stream.time_base) > 180:
+                        raise HTTPException(413, "Video must be no longer than three minutes")
+            else:
+                if not container.streams.audio:
+                    raise ValueError("No audio stream")
+                duration = 0.0
+                for frame in container.decode(audio=0):
+                    duration += frame.samples / frame.sample_rate
+                    if duration > 180:
+                        raise HTTPException(413, "Audio must be no longer than three minutes")
+                if duration == 0:
+                    raise ValueError("Empty audio")
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(415, "Audio could not be decoded") from None
+        raise HTTPException(415, "Recording could not be decoded") from None
     name = f"{uuid4()}{suffix}"
     if remote:
         _storage(name, "POST", raw, file.content_type)
     else:
         (destination / name).write_bytes(raw)
-    return name, file.content_type, "audio"
+    return name, file.content_type, "video" if is_video else "audio"
 
 
 @contextmanager

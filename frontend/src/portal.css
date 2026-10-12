@@ -728,6 +728,35 @@
   line-height: 1.7;
   white-space: pre-wrap;
 }
+.department-case-popup-evidence {
+  display: block;
+  width: 100%;
+  max-height: 190px;
+  object-fit: cover;
+  margin: 15px 0;
+  border: 1px solid #d3ddd4;
+}
+.department-case-popup-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+  padding: 14px 0;
+  border-top: 1px solid #d5ded5;
+  border-bottom: 1px solid #d5ded5;
+}
+.department-case-popup-facts dt {
+  color: #54736a;
+  font: 9px Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.department-case-popup-facts dd {
+  margin: 4px 0 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.department-shell .user-topbar > div { gap: 9px; }
 .department-case-popup small {
   font-size: 11px;
   color: #4e6964;
@@ -801,6 +830,31 @@
   border-radius: 2px;
   background: #f5f7f1;
   color: #203c39;
+}
+.department-account-form input[type="file"] {
+  height: auto;
+  min-height: 42px;
+  background: #fffef9;
+}
+.department-account-form .department-verification-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.5;
+}
+.department-verification-check input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: #087b68;
+}
+.department-account-list article > a {
+  color: #087b68;
+  font-size: 11px;
+  white-space: nowrap;
 }
 .department-account-form > small {
   color: #55736a;

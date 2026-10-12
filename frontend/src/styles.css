@@ -1661,7 +1661,8 @@ h1 {
 .attachments > div {
   position: relative;
 }
-.attachments img {
+.attachments img,
+.attachments video {
   width: 130px;
   height: 100px;
   object-fit: cover;

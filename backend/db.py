@@ -142,11 +142,14 @@ class ResponderAlert(Record, Base):
 
 class Account(Record, Base):
     __tablename__ = "accounts"
+    __table_args__ = (Index("ix_accounts_official_id", "official_id", unique=True),)
     email: Mapped[str] = mapped_column(String(254), unique=True)
     name: Mapped[str] = mapped_column(String(80))
     password_hash: Mapped[str] = mapped_column(String(200))
     role: Mapped[str] = mapped_column(String(10), default="user")
     department: Mapped[str | None] = mapped_column(String(30))
+    official_id: Mapped[str | None] = mapped_column(String(100))
+    verification_media_id: Mapped[str | None] = mapped_column(ForeignKey("media.id"))
 
 
 class LoginSession(Base):

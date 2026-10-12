@@ -204,6 +204,30 @@ def test_audio_disabled_honest_error(client, payload):
     assert client.post(f"/api/reports/{report['id']}/transcribe").status_code == 503
 
 
+def test_video_upload_is_preserved_as_playable_evidence(client, payload, monkeypatch):
+    pytest.importorskip("av")
+
+    class Container:
+        streams = type("Streams", (), {"video": [type("Stream", (), {"duration": 2, "time_base": 1})()]})()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+    monkeypatch.setattr("av.open", lambda *args, **kwargs: Container())
+    video = client.post(
+        "/api/media",
+        files={"file": ("incident.webm", b"\x1aE\xdf\xa3sample", "video/webm")},
+    )
+
+    assert video.status_code == 201
+    assert video.json()["kind"] == "video"
+    report = post(client, {**payload, "media_ids": [video.json()["id"]]})
+    assert report["media"][0]["kind"] == "video"
+
+
 def test_health_analytics_and_unknown_id(client, payload, monkeypatch):
     import httpx
 

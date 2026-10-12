@@ -42,10 +42,13 @@ it("opens a department popup for the next newly assigned live case", async () =>
     refreshes += 1;
     const rows = refreshes === 1
       ? [caseRecord("fire-one", "Fire reported at the station")]
-      : [caseRecord("fire-two", "Second fire reported at the station"), caseRecord("fire-one", "Fire reported at the station")];
+      : [caseRecord("fire-two", "Second fire reported at the station"), caseRecord("fire-three", "Third fire reported at the market"), caseRecord("fire-one", "Fire reported at the station")];
     return { ok: true, json: async () => rows } as Response;
   });
   vi.stubGlobal("fetch", fetcher);
+  const NotificationMock = vi.fn().mockImplementation(() => ({ onclick: null }));
+  Object.assign(NotificationMock, { permission: "granted" });
+  vi.stubGlobal("Notification", NotificationMock);
   const account: Account = {
     id: "fire-account",
     name: "Fire Desk",
@@ -57,9 +60,14 @@ it("opens a department popup for the next newly assigned live case", async () =>
   render(<CaseBoard account={account} />);
 
   expect(await screen.findByRole("dialog")).toHaveTextContent("Fire reported at the station");
-  fireEvent.click(screen.getByRole("button", { name: "Open case" }));
+  expect(await screen.findByText("Coordinates")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "View incident details" }));
   fireEvent(window, new Event("resq-live-update"));
 
   expect(await screen.findByRole("dialog")).toHaveTextContent("Second fire reported at the station");
+  expect(NotificationMock).toHaveBeenCalledWith("New fire alert", expect.objectContaining({
+    body: "Barasat station · high priority",
+  }));
+  expect(NotificationMock).toHaveBeenCalledTimes(2);
   expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(2);
 });

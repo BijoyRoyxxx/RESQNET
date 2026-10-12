@@ -129,11 +129,13 @@ function SignIn({ onSession }: { onSession: (session: Session) => void }) {
     const data = new FormData(event.currentTarget);
     try {
       const result = await api<Session>(
-        `/auth/${register ? "register" : "login"}`,
+        `/auth/${register ? "register" : department ? "department-login" : "login"}`,
         {
           method: "POST",
           body: JSON.stringify({
-            email: data.get("email"),
+            ...(department && !register
+              ? { identifier: data.get("email") }
+              : { email: data.get("email") }),
             password: data.get("password"),
             ...(register ? { name: data.get("name") } : {}),
           }),
@@ -229,7 +231,7 @@ function SignIn({ onSession }: { onSession: (session: Session) => void }) {
           </h2>
           <p>
             {department
-              ? "Sign in with credentials issued by your workspace administrator."
+              ? "Use the official ID or email and password issued after your administrator verifies your department certificate."
               : admin
               ? "Review incoming cases, assign a responder from your admin team, and keep people informed."
               : "Your reports and the team’s replies stay here, including after you sign out."}
@@ -247,10 +249,10 @@ function SignIn({ onSession }: { onSession: (session: Session) => void }) {
             </label>
           )}
           <label>
-            Email address
+            {department ? "Official ID or email address" : "Email address"}
             <input
               name="email"
-              type="email"
+              type={department ? "text" : "email"}
               required
               maxLength={254}
               autoComplete="username"

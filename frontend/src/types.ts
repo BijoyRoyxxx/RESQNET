@@ -16,7 +16,7 @@ export interface Extraction {
 }
 export interface Media {
   id: string;
-  kind: "image" | "audio";
+  kind: "image" | "audio" | "video";
   url: string;
   transcript?: string;
 }

@@ -214,6 +214,8 @@ export function IncidentDetail({
                             alt={`Supporting evidence for report ${shortId(r.id)}`}
                           />
                         </a>
+                      ) : m.kind === "video" ? (
+                        <video key={m.id} src={m.url} controls playsInline aria-label="Supporting incident video" />
                       ) : (
                         <audio key={m.id} src={m.url} controls />
                       ),

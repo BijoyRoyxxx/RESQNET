@@ -1,3 +1,6 @@
+from io import BytesIO
+
+from PIL import Image
 from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
@@ -16,6 +19,14 @@ def add_report(client, category, text):
 
 
 def issue_account(client, department, email):
+    image = BytesIO()
+    Image.new("RGB", (1, 1), "white").save(image, format="PNG")
+    upload = client.post(
+        "/api/media",
+        files={"file": ("government-id.png", image.getvalue(), "image/png")},
+    )
+    assert upload.status_code == 201
+    official_id = f"{department.upper()}-{email.split('@')[0]}"
     response = client.post(
         "/api/admin/department-accounts",
         json={
@@ -23,15 +34,19 @@ def issue_account(client, department, email):
             "email": email,
             "password": "Department desk password 2026",
             "department": department,
+            "official_id": official_id,
+            "verification_media_id": upload.json()["id"],
+            "verified": True,
         },
     )
     assert response.status_code == 201
     return response.json()
 
 
-def sign_in(client, email):
+def sign_in(client, identifier):
     response = client.post(
-        "/api/auth/login", json={"email": email, "password": "Department desk password 2026"}
+        "/api/auth/department-login",
+        json={"identifier": identifier, "password": "Department desk password 2026"},
     )
     assert response.status_code == 200
     client.headers["X-CSRF-Token"] = response.json()["csrf"]
@@ -52,11 +67,15 @@ def test_category_routes_cover_specialist_desks_and_police_fallback():
 def test_department_reads_and_updates_only_its_assigned_cases(anonymous_client, client):
     fire = add_report(client, "fire", "A fire is burning near the market.")
     medical = add_report(client, "medical", "An injured person needs medical help.")
-    issue_account(client, "fire", "fire-desk@test.local")
-    account = sign_in(anonymous_client, "fire-desk@test.local")
+    issued = issue_account(client, "fire", "fire-desk@test.local")
+    provisioned = client.get("/api/admin/department-accounts").json()[0]
+    assert provisioned["official_id"] == issued["official_id"]
+    assert client.get(provisioned["verification_url"]).status_code == 200
+    account = sign_in(anonymous_client, issued["official_id"].lower())
 
     assert account["role"] == "department"
     assert account["department"] == "fire"
+    assert anonymous_client.get(provisioned["verification_url"]).status_code == 404
     cases = anonymous_client.get("/api/department/cases")
     assert cases.status_code == 200
     assert [case["report"]["id"] for case in cases.json()] == [fire["id"]]
@@ -100,8 +119,8 @@ def test_department_reads_and_updates_only_its_assigned_cases(anonymous_client, 
 
 
 def test_department_can_use_nearby_lookup_without_reading_other_cases(anonymous_client, client, monkeypatch):
-    issue_account(client, "fire", "fire-nearby@test.local")
-    sign_in(anonymous_client, "fire-nearby@test.local")
+    issued = issue_account(client, "fire", "fire-nearby@test.local")
+    sign_in(anonymous_client, issued["email"])
     monkeypatch.setattr(
         "backend.main.search_services",
         lambda db, payload: {"service": payload.service, "facilities": []},
@@ -136,8 +155,12 @@ def test_startup_migration_adds_routing_to_existing_database(tmp_path):
     engine = make_engine(f"sqlite:///{tmp_path / 'previous-schema.db'}")
     with engine.begin() as connection:
         connection.exec_driver_sql(
+            "CREATE TABLE media (id VARCHAR(36) PRIMARY KEY, report_id VARCHAR(36), kind VARCHAR(10), "
+            "mime VARCHAR(50), path VARCHAR(200), transcript TEXT, created_at DATETIME, updated_at DATETIME)"
+        )
+        connection.exec_driver_sql(
             "CREATE TABLE accounts (id VARCHAR(36) PRIMARY KEY, email VARCHAR(254), name VARCHAR(80), "
-            "password_hash VARCHAR(200), role VARCHAR(10))"
+            "password_hash VARCHAR(200), role VARCHAR(10), created_at DATETIME, updated_at DATETIME)"
         )
         connection.exec_driver_sql(
             "CREATE TABLE reports (id VARCHAR(36) PRIMARY KEY, text TEXT, language VARCHAR(8), "

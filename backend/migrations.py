@@ -12,6 +12,15 @@ def upgrade_department_routing(engine: Engine) -> None:
         columns = {item["name"] for item in inspect(connection).get_columns("accounts")}
         if "department" not in columns:
             connection.execute(text("ALTER TABLE accounts ADD COLUMN department VARCHAR(30)"))
+        if "official_id" not in columns:
+            connection.execute(text("ALTER TABLE accounts ADD COLUMN official_id VARCHAR(100)"))
+        if "verification_media_id" not in columns:
+            connection.execute(
+                text("ALTER TABLE accounts ADD COLUMN verification_media_id VARCHAR(36) REFERENCES media(id)")
+            )
+        connection.execute(
+            text("CREATE UNIQUE INDEX IF NOT EXISTS ix_accounts_official_id ON accounts (official_id)")
+        )
 
         columns = {item["name"] for item in inspect(connection).get_columns("report_cases")}
         if "department" not in columns:

@@ -121,7 +121,8 @@ async def local_write_guard(request: Request, call_next):
     if (
         request.method in {"POST", "PATCH", "PUT", "DELETE"}
         and response.status_code < 400
-        and request.url.path not in {"/api/services/nearby", "/api/auth/login", "/api/auth/logout"}
+        and request.url.path
+        not in {"/api/services/nearby", "/api/auth/login", "/api/auth/department-login", "/api/auth/logout"}
     ):
         await updates.publish()
     response.headers["X-Content-Type-Options"] = "nosniff"

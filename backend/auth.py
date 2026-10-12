@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -95,7 +95,7 @@ def owned_media(db: Session, account: Account, media_id: str):
 
 def authorize(request: Request, db: DB):
     path = request.url.path
-    if path in {"/api/auth/login", "/api/auth/register", "/api/health"}:
+    if path in {"/api/auth/login", "/api/auth/department-login", "/api/auth/register", "/api/health"}:
         return
     account = current_account(request, db)
     if account.role == "admin":
@@ -147,6 +147,17 @@ class Credentials(BaseModel):
     @classmethod
     def normalize_email(cls, value):
         return value.strip().lower() if isinstance(value, str) else value
+
+
+class DepartmentCredentials(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    identifier: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=12, max_length=128)
+
+    @field_validator("identifier", mode="before")
+    @classmethod
+    def normalize_identifier(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class Registration(Credentials):
@@ -222,6 +233,23 @@ def login(payload: Credentials, request: Request, response: Response, db: DB):
     candidate = password_hash(payload.password, stored.split("$")[1])
     if not account or not secrets.compare_digest(candidate, stored):
         raise HTTPException(401, "Email or password is incorrect")
+    return start_session(db, account, response, request)
+
+
+@router.post("/department-login")
+def department_login(payload: DepartmentCredentials, request: Request, response: Response, db: DB):
+    throttle(request, db)
+    identifier = payload.identifier
+    account = db.scalar(
+        select(Account).where(
+            Account.role == "department",
+            or_(Account.email == identifier.lower(), Account.official_id == identifier.upper()),
+        )
+    )
+    stored = account.password_hash if account else f"scrypt${'00' * 16}${'00' * 64}"
+    candidate = password_hash(payload.password, stored.split("$")[1])
+    if not account or not secrets.compare_digest(candidate, stored):
+        raise HTTPException(401, "Official ID or password is incorrect")
     return start_session(db, account, response, request)
 
 

@@ -1,12 +1,12 @@
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
 from backend.auth import DB, Registration, User, owned_report, password_hash, public_account
-from backend.db import Account, CaseMessage, Report, ReportCase, now
+from backend.db import Account, CaseMessage, Media, MediaOwner, Report, ReportCase, now
 from backend.departments import DEPARTMENT_LABELS, DepartmentName, department_for_category
 from backend.intelligence import priority
 from backend.schemas import Category
@@ -141,12 +141,26 @@ def admins(db: DB):
 
 class DepartmentAccountInput(Registration):
     department: DepartmentName
+    official_id: str = Field(min_length=3, max_length=100)
+    verification_media_id: str = Field(min_length=36, max_length=36)
+    verified: Literal[True]
+
+    @field_validator("official_id", mode="before")
+    @classmethod
+    def normalize_official_id(cls, value: str) -> str:
+        return value.strip().upper()
 
 
 @router.get("/admin/department-accounts")
 def department_accounts(db: DB):
     return [
-        public_account(account)
+        {
+            **public_account(account),
+            "official_id": account.official_id,
+            "verification_url": f"/api/media/{account.verification_media_id}"
+            if account.verification_media_id
+            else None,
+        }
         for account in db.scalars(
             select(Account).where(Account.role == "department").order_by(Account.department, Account.name)
         )
@@ -154,20 +168,28 @@ def department_accounts(db: DB):
 
 
 @router.post("/admin/department-accounts", status_code=201)
-def create_department_account(payload: DepartmentAccountInput, db: DB):
+def create_department_account(payload: DepartmentAccountInput, db: DB, admin: User):
+    if admin.role != "admin":
+        raise HTTPException(403, "Administrator access required")
+    proof = db.get(Media, payload.verification_media_id)
+    owner = db.get(MediaOwner, payload.verification_media_id)
+    if proof is None or proof.kind != "image" or owner is None or owner.account_id != admin.id:
+        raise HTTPException(422, "Upload a government ID or certificate image from this admin session")
     account = Account(
         email=payload.email,
         name=payload.name,
         password_hash=password_hash(payload.password),
         role="department",
         department=payload.department,
+        official_id=payload.official_id,
+        verification_media_id=payload.verification_media_id,
     )
     db.add(account)
     try:
         db.flush()
     except IntegrityError:
-        raise HTTPException(409, "An account with this email already exists") from None
-    return public_account(account)
+        raise HTTPException(409, "That email or official ID is already registered") from None
+    return {**public_account(account), "official_id": account.official_id}
 
 
 class MessageInput(BaseModel):

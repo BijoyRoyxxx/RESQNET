@@ -101,12 +101,33 @@ export function CaseBoard({
       if (version !== refreshVersion.current) return;
       if (department) {
         const previous = knownDepartmentCases.current;
+        const newCases = previous
+          ? result.filter((item) => !previous.has(item.report.id) && item.status !== "resolved")
+          : [];
         const nextCase = previous
-          ? result.find((item) => !previous.has(item.report.id) && item.status !== "resolved")
+          ? newCases[0]
           : result.find((item) => item.status !== "resolved");
         if (nextCase) {
           setSelected(nextCase.report.id);
           setIncoming(nextCase);
+          if (previous && typeof Notification !== "undefined" && Notification.permission === "granted") {
+            for (const assignedCase of newCases) {
+              try {
+                const categoryLabel = categoryNames[assignedCase.category] || "Incident";
+                const notification = new Notification(`New ${categoryLabel.toLowerCase()} alert`, {
+                  body: `${assignedCase.report.location_text || "Location not supplied"} · ${assignedCase.urgency} priority`,
+                  tag: `resq-${assignedCase.report.id}`,
+                });
+                notification.onclick = () => {
+                  window.focus();
+                  setSelected(assignedCase.report.id);
+                  setIncoming(null);
+                };
+              } catch {
+                // The in-app incoming-case dialog still works if the browser blocks desktop alerts.
+              }
+            }
+          }
         }
         knownDepartmentCases.current = new Set(result.map((item) => item.report.id));
       }
@@ -154,9 +175,23 @@ export function CaseBoard({
             <span className="eyebrow">NEW CASE / {departmentLabel(account.department).toUpperCase()}</span>
             <h2 id="department-case-title">{categoryNames[incoming.category]} report assigned to your desk.</h2>
             <p>{incoming.report.text}</p>
-            <small>{incoming.report.location_text || "Location not specified"} · {fullDate(incoming.report.created_at)}</small>
+            {(() => {
+              const evidence = incoming.report.media.find((media) => media.kind === "image" || media.kind === "video");
+              if (!evidence) return null;
+              return evidence.kind === "image" ? (
+                <img className="department-case-popup-evidence" src={evidence.url} alt="Evidence attached to this incident" />
+              ) : (
+                <video className="department-case-popup-evidence" src={evidence.url} controls playsInline aria-label="Video evidence attached to this incident" />
+              );
+            })()}
+            <dl className="department-case-popup-facts">
+              <div><dt>Location</dt><dd>{incoming.report.location_text || "Not specified"}</dd></div>
+              <div><dt>Coordinates</dt><dd>{incoming.report.latitude != null && incoming.report.longitude != null ? `${incoming.report.latitude}, ${incoming.report.longitude}` : "Not supplied"}</dd></div>
+              <div><dt>Reported</dt><dd>{fullDate(incoming.report.created_at)}</dd></div>
+              <div><dt>Priority / status</dt><dd>{readable(incoming.urgency)} · {readable(incoming.status)}</dd></div>
+            </dl>
             <div>
-              <Button onClick={() => setIncoming(null)}>Open case</Button>
+              <Button onClick={() => setIncoming(null)}>View incident details</Button>
               <Button variant="ghost" onClick={() => setIncoming(null)}>Dismiss</Button>
             </div>
           </section>
@@ -416,6 +451,8 @@ export function CaseBoard({
                     <a key={m.id} href={m.url} target="_blank" rel="noreferrer">
                       <img src={m.url} alt="Submitted evidence" />
                     </a>
+                  ) : m.kind === "video" ? (
+                    <video key={m.id} src={m.url} controls playsInline aria-label="Submitted video evidence" />
                   ) : (
                     <audio key={m.id} src={m.url} controls />
                   ),

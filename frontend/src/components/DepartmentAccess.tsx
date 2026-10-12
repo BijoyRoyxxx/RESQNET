@@ -5,14 +5,19 @@ import { departments, departmentLabel } from "../departments";
 import { Button } from "./ui/button";
 import type { Account } from "../PortalApp";
 
+type DepartmentAccount = Account & {
+  official_id: string | null;
+  verification_url: string | null;
+};
+
 export function DepartmentAccess() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accounts, setAccounts] = useState<DepartmentAccount[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const refresh = useCallback(async () => {
     try {
-      setAccounts(await api<Account[]>("/admin/department-accounts"));
+      setAccounts(await api<DepartmentAccount[]>("/admin/department-accounts"));
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -31,6 +36,13 @@ export function DepartmentAccess() {
     setError("");
     setNotice("");
     try {
+      const verification = values.get("verification") as File;
+      const upload = new FormData();
+      upload.set("file", verification);
+      const proof = await api<{ id: string }>("/media", {
+        method: "POST",
+        body: upload,
+      });
       const account = await api<Account>("/admin/department-accounts", {
         method: "POST",
         body: JSON.stringify({
@@ -38,6 +50,9 @@ export function DepartmentAccess() {
           email: values.get("email"),
           password: values.get("password"),
           department: values.get("department"),
+          official_id: values.get("official_id"),
+          verification_media_id: proof.id,
+          verified: values.get("verified") === "on",
         }),
       });
       form.reset();
@@ -79,6 +94,14 @@ export function DepartmentAccess() {
             <input name="name" required minLength={2} maxLength={80} />
           </label>
           <label>
+            Official ID / badge number
+            <input name="official_id" required minLength={3} maxLength={100} autoComplete="off" />
+          </label>
+          <label>
+            Government ID or department certificate
+            <input name="verification" type="file" accept="image/jpeg,image/png,image/webp" required />
+          </label>
+          <label>
             Email address
             <input name="email" type="email" required maxLength={254} />
           </label>
@@ -86,7 +109,11 @@ export function DepartmentAccess() {
             Initial password
             <input name="password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
           </label>
-          <small>Give this password to the staff member privately. Use at least 12 characters.</small>
+          <label className="department-verification-check">
+            <input name="verified" type="checkbox" required />
+            I checked this ID and confirm the staff member’s department.
+          </label>
+          <small>Upload a clear ID or certificate image, then give the initial password to the staff member privately.</small>
           {error && <div className="error" role="alert">{error}</div>}
           {notice && <div className="notice" role="status">{notice}</div>}
           <Button type="submit" disabled={busy}>{busy ? "Creating sign-in…" : "Create sign-in"}</Button>
@@ -98,8 +125,9 @@ export function DepartmentAccess() {
           </div>
           {!accounts.length ? <p className="muted">No department accounts yet.</p> : accounts.map((account) => (
             <article key={account.id}>
-              <div><strong>{account.name}</strong><small>{account.email}</small></div>
+              <div><strong>{account.name}</strong><small>{account.email}{account.official_id ? ` · ${account.official_id}` : ""}</small></div>
               <span>{departmentLabel(account.department)}</span>
+              {account.verification_url && <a href={account.verification_url} target="_blank" rel="noreferrer">Verified ID ↗</a>}
             </article>
           ))}
         </section>
