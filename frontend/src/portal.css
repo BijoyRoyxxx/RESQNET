@@ -1103,3 +1103,110 @@
     gap: 20px;
   }
 }
+.department-map-section {
+  margin: 22px 0 26px;
+  padding: 20px;
+  border: 1px solid var(--line, #c8d6d1);
+  background: #fbfcf8;
+}
+
+.department-map-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.department-map-heading h2 {
+  margin: 6px 0 0;
+  font-family: var(--serif, Georgia, serif);
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+}
+
+.department-map-heading > span,
+.department-map-legend {
+  color: var(--muted, #53636b);
+  font-size: 0.78rem;
+}
+
+.department-map-frame {
+  height: 360px;
+  min-height: 260px;
+  overflow: hidden;
+  border: 1px solid #bfcec9;
+}
+
+.department-map-frame .leaflet-container {
+  height: 100%;
+  width: 100%;
+}
+
+.department-map-marker {
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.department-map-marker span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 7px #162b303d;
+  background: #fffdf6;
+  font: 700 19px/1 system-ui, sans-serif;
+}
+
+.department-map-marker-fire span { color: #b9472e; }
+.department-map-marker-medical span { color: #2877a6; }
+.department-map-marker-crime span { color: #987021; }
+.department-map-marker-women_safety span { color: #7a558f; }
+.department-map-marker-flood span { color: #267d85; }
+.department-map-marker-infrastructure span { color: #756b42; }
+.department-map-marker-unknown span { color: #53636b; }
+
+.department-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding-top: 12px;
+}
+
+.department-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.department-map-legend i {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  color: white;
+  font-style: normal;
+  font-size: 12px;
+}
+
+.department-map-empty {
+  padding: 24px;
+  border: 1px dashed #aebfba;
+  color: var(--muted, #53636b);
+  background: #f4f7f2;
+}
+
+.department-case-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 620px) {
+  .department-map-section { padding: 14px; }
+  .department-map-heading { align-items: start; flex-direction: column; }
+  .department-map-frame { height: 300px; }
+}

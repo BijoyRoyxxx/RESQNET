@@ -13,6 +13,7 @@ import { Button } from "./ui/button";
 import { NearbyHelp } from "./NearbyHelp";
 import { groupNearbyCases } from "./nearbyCaseGroups";
 import { departmentLabel } from "../departments";
+import { DepartmentCaseMap } from "./DepartmentCaseMap";
 
 interface Message {
   id: string;
@@ -248,6 +249,15 @@ export function CaseBoard({
           : refreshing ? "Loading cases…" : error ? "Cases could not be loaded" : "Waiting for cases"}{" "}
         <span>{admin ? `${visible.length} reports · ${groups.length} groups` : `${visible.length} shown`}</span>
       </div>
+      {department && (
+        <DepartmentCaseMap
+          cases={cases}
+          onSelect={(reportId) => {
+            setSelected(reportId);
+            setRevision(0);
+          }}
+        />
+      )}
       {error && (
         <div role="alert" className="error">
           {error}. {updated && "Displayed records may be out of date."}
@@ -658,6 +668,7 @@ function DepartmentCaseForm({
   item: Case;
   onSaved: () => void;
 }) {
+  const [caseStatus, setCaseStatus] = useState(item.status);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -673,7 +684,7 @@ function DepartmentCaseForm({
         method: "PATCH",
         body: JSON.stringify({
           version: item.version,
-          status: values.get("status"),
+          status: caseStatus,
           urgency: values.get("urgency") || null,
           body: values.get("body"),
         }),
@@ -693,8 +704,8 @@ function DepartmentCaseForm({
       <div className="case-form-grid">
         <label>
           Case status
-          <select name="status" defaultValue={item.status}>
-            {statuses.map((status) => <option key={status} value={status}>{status === "resolved" ? "Solved" : readable(status)}</option>)}
+          <select name="status" value={caseStatus} onChange={(event) => setCaseStatus(event.target.value)}>
+            {statuses.map((value) => <option key={value} value={value}>{value === "resolved" ? "Solved" : readable(value)}</option>)}
           </select>
         </label>
         <label>
@@ -707,11 +718,20 @@ function DepartmentCaseForm({
       </div>
       <label>
         Update or resolution explanation
-        <textarea name="body" minLength={3} maxLength={2000} required placeholder="Record what the department checked or did. Explain how a case was solved." />
+        <textarea name="body" minLength={3} maxLength={2000} required placeholder={caseStatus === "resolved" ? "Explain what action resolved the case and when." : "Record what the department checked or did."} />
       </label>
       {error && <div className="error" role="alert">{error}</div>}
       {saved && <div className="notice" role="status">Department update shared with the reporter.</div>}
-      <Button type="submit" disabled={busy}>{busy ? "Saving update…" : "Save case update"}</Button>
+      <div className="department-case-actions">
+        {item.status !== "resolved" && caseStatus !== "resolved" && (
+          <Button type="button" variant="outline" onClick={() => setCaseStatus("resolved")}>
+            Mark case solved
+          </Button>
+        )}
+        <Button type="submit" disabled={busy}>
+          {busy ? "Saving update…" : caseStatus === "resolved" ? "Save solved case" : "Save case update"}
+        </Button>
+      </div>
     </form>
   );
 }

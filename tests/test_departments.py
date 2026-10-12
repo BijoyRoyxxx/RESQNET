@@ -1,8 +1,9 @@
-from backend.departments import department_for_category
-from backend.db import ReportCase, make_engine
-from backend.migrations import upgrade_department_routing
 from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
+
+from backend.db import ReportCase, make_engine
+from backend.departments import department_for_category
+from backend.migrations import upgrade_department_routing
 
 
 def add_report(client, category, text):
@@ -72,6 +73,19 @@ def test_department_reads_and_updates_only_its_assigned_cases(anonymous_client, 
     assert updated.status_code == 200
     assert updated.json()["status"] == "acknowledged"
 
+    solved = anonymous_client.patch(
+        f"/api/department/cases/{fire['id']}",
+        json={
+            "version": updated.json()["version"],
+            "status": "resolved",
+            "urgency": None,
+            "body": "Fire crew confirmed the area is safe and closed the response.",
+        },
+    )
+    assert solved.status_code == 200
+    assert solved.json()["status"] == "resolved"
+    assert solved.json()["messages"][-1]["body"].startswith("Fire crew confirmed")
+
     assert anonymous_client.get(f"/api/reports/{medical['id']}").status_code == 404
     denied = anonymous_client.patch(
         f"/api/department/cases/{medical['id']}",
@@ -83,6 +97,24 @@ def test_department_reads_and_updates_only_its_assigned_cases(anonymous_client, 
         "/api/admin/department-accounts",
         json={"name": "Other desk", "email": "other@test.local", "password": "Department desk password 2026", "department": "police"},
     ).status_code == 403
+
+
+def test_department_can_use_nearby_lookup_without_reading_other_cases(anonymous_client, client, monkeypatch):
+    issue_account(client, "fire", "fire-nearby@test.local")
+    sign_in(anonymous_client, "fire-nearby@test.local")
+    monkeypatch.setattr(
+        "backend.main.search_services",
+        lambda db, payload: {"service": payload.service, "facilities": []},
+    )
+
+    response = anonymous_client.post(
+        "/api/services/nearby",
+        json={"latitude": 22.72, "longitude": 88.48, "service": "fire"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"service": "fire", "facilities": []}
+    assert anonymous_client.get("/api/admin/cases").status_code == 403
 
 
 def test_womens_safety_and_uncategorized_reports_route_to_their_desks(client):

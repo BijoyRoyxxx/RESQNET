@@ -105,6 +105,8 @@ def authorize(request: Request, db: DB):
     if account.role == "department":
         if path.startswith("/api/department/") and account.department:
             return
+        if request.method == "POST" and path == "/api/services/nearby":
+            return
         if path == "/api/live":
             return
         parts = path.strip("/").split("/")
