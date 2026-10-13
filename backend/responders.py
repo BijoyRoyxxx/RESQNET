@@ -11,7 +11,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.config import settings
+from backend.config import GLOBAL_OVERPASS_URLS, settings
 from backend.db import Report, ResponderAlert, ServiceSearch, now
 from backend.intelligence import KEYWORDS, haversine, signal
 from backend.schemas import AlertInput, NearbyInput
@@ -134,11 +134,14 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
             selectors = f"({selectors});"
         query = f"[out:json][timeout:8];{selectors}out body center;"
         facilities = None
-        providers = list(dict.fromkeys([settings.overpass_url, *settings.overpass_fallback_urls]))[:3]
+        providers = [
+            provider
+            for provider in dict.fromkeys(
+                [settings.overpass_url, *settings.overpass_fallback_urls, *GLOBAL_OVERPASS_URLS]
+            )
+            if urlparse(provider).hostname not in {"overpass.osm.ch", "overpass.maprva.org"}
+        ][:3]
         for provider in providers:
-            # These formerly configured fallbacks contain no Indian map data.
-            if urlparse(provider).hostname in {"overpass.osm.ch", "overpass.maprva.org"}:
-                continue
             with provider_lock:
                 if provider_cooldown.get(provider, 0) > time.monotonic():
                     continue

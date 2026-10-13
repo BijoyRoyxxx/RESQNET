@@ -206,6 +206,14 @@ def test_regional_providers_cannot_claim_no_stations_in_india(client, monkeypatc
     assert [url for url, _ in calls] == ["https://overpass-api.de/api/interpreter"]
 
 
+def test_legacy_regional_config_still_has_global_fallbacks(client, monkeypatch):
+    monkeypatch.setattr(settings, "overpass_url", "https://overpass.osm.ch/api/interpreter")
+    monkeypatch.setattr(settings, "overpass_fallback_urls", ["https://overpass.maprva.org/api/interpreter"])
+    calls = mock_map(monkeypatch)
+    assert search(client)["facilities"]
+    assert calls[0][0] == "https://overpass.private.coffee/api/interpreter"
+
+
 def test_empty_and_failure_are_not_fake_stations(client, monkeypatch):
     calls = mock_map(monkeypatch, [])
     assert search(client)["facilities"] == []

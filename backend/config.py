@@ -4,6 +4,12 @@ from typing import Literal
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+GLOBAL_OVERPASS_URLS = [
+    "https://overpass.private.coffee/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -26,11 +32,8 @@ class Settings(BaseSettings):
     match_threshold: float = 0.62
     voice_enabled: bool = False
     whisper_model: str = "small"
-    overpass_url: str = "https://overpass.private.coffee/api/interpreter"
-    overpass_fallback_urls: list[str] = [
-        "https://overpass-api.de/api/interpreter",
-        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-    ]
+    overpass_url: str = GLOBAL_OVERPASS_URLS[0]
+    overpass_fallback_urls: list[str] = GLOBAL_OVERPASS_URLS[1:]
     responder_webhooks: dict[str, str] = {}
     responder_token: SecretStr = SecretStr("")
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
