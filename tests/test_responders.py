@@ -157,11 +157,53 @@ def test_lookup_sorts_caches_and_does_not_forward_report_text(client, monkeypatc
     assert first["distance_method"] == "straight_line"
     assert "stolen" not in calls[0][1]["data"]["data"]
     assert "[timeout:8]" in calls[0][1]["data"]["data"]
+    assert "out body center;" in calls[0][1]["data"]["data"]
     assert "[maxsize:" not in calls[0][1]["data"]["data"]
     assert "around:10000," in calls[0][1]["data"]["data"]
     assert calls[0][1]["timeout"] == 12
     assert search(client)["cached"] is True
     assert len(calls) == 1
+
+
+def test_empty_cache_is_refetched_after_regional_provider_fix(client, monkeypatch):
+    mock_map(monkeypatch, [])
+    first = search(client)
+    assert not first["facilities"]
+    calls = mock_map(monkeypatch)
+    second = search(client)
+    assert second["facilities"] and not second["cached"]
+    assert second["id"] != first["id"]
+    assert len(calls) == 1
+
+
+def test_tag_only_nodes_trigger_fallback_instead_of_false_empty(client, monkeypatch):
+    calls = []
+
+    def post(url, **kwargs):
+        calls.append(url)
+        elements = ELEMENTS
+        if url == settings.overpass_url:
+            elements = [{"type": "node", "id": 10, "tags": {"amenity": "police"}}]
+        return httpx.Response(200, json={"elements": elements}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr("backend.responders.httpx.post", post)
+    assert search(client)["facilities"][0]["id"] == "node/10"
+    assert len(calls) == 2
+
+
+def test_regional_providers_cannot_claim_no_stations_in_india(client, monkeypatch):
+    monkeypatch.setattr(settings, "overpass_url", "https://overpass.osm.ch/api/interpreter")
+    monkeypatch.setattr(
+        settings,
+        "overpass_fallback_urls",
+        [
+            "https://overpass.maprva.org/api/interpreter",
+            "https://overpass-api.de/api/interpreter",
+        ],
+    )
+    calls = mock_map(monkeypatch)
+    assert search(client)["facilities"]
+    assert [url for url, _ in calls] == ["https://overpass-api.de/api/interpreter"]
 
 
 def test_empty_and_failure_are_not_fake_stations(client, monkeypatch):

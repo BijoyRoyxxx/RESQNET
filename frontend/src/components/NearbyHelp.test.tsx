@@ -71,7 +71,7 @@ it("offers a map search for empty coverage and hides results after location chan
   });
   expect(fallback.getAttribute("href")).toContain("22.7%2C%2088.4");
   expect(
-    screen.getByText(/not confirmation that no service exists/i),
+    screen.getByText(/does not confirm that no service exists/i),
   ).toBeVisible();
   expect(clearWatch).toHaveBeenCalledWith(17);
   act(() =>

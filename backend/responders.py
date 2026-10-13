@@ -118,6 +118,9 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
     )
     if existing and service == "medical" and any(f.get("kind") != "hospital" for f in existing.facilities):
         existing = None
+    # Older regional providers cached empty responses for locations outside their coverage.
+    if existing and not existing.facilities:
+        existing = None
     recent = existing is not None and existing.created_at.replace(tzinfo=timezone.utc) >= now() - timedelta(
         minutes=10
     )
@@ -129,10 +132,13 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
         selectors = "".join(f"nwr{tag}({center});" for tag in SERVICE_TAGS[service])
         if len(SERVICE_TAGS[service]) > 1:
             selectors = f"({selectors});"
-        query = f"[out:json][timeout:8];{selectors}out center tags;"
+        query = f"[out:json][timeout:8];{selectors}out body center;"
         facilities = None
         providers = list(dict.fromkeys([settings.overpass_url, *settings.overpass_fallback_urls]))[:3]
         for provider in providers:
+            # These formerly configured fallbacks contain no Indian map data.
+            if urlparse(provider).hostname in {"overpass.osm.ch", "overpass.maprva.org"}:
+                continue
             with provider_lock:
                 if provider_cooldown.get(provider, 0) > time.monotonic():
                     continue
@@ -151,6 +157,14 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
                     or not isinstance(result.get("elements"), list)
                 ):
                     raise ValueError("Incomplete provider response")
+                if any(
+                    not isinstance(element, dict)
+                    or not {"lat", "lon"}.issubset(
+                        element if element.get("type") == "node" else element.get("center", {})
+                    )
+                    for element in result["elements"]
+                ):
+                    raise ValueError("Provider response is missing facility coordinates")
                 facilities = facility_rows(
                     result["elements"], payload.latitude, payload.longitude, payload.radius_km
                 )

@@ -10,6 +10,8 @@ Search submits coordinates and a service filter to the configured OpenStreetMap 
 
 Distances are **straight-line estimates**, not road distance, travel time or responder arrival time. Directions open an external maps provider with the selected coordinates only after clicking the link. Community map data can miss stations, list administrative police offices, or have outdated contact details. The closest mapped result may not be the responsible jurisdiction. There is no claim that facilities are staffed, operational, reachable or accepting reports. No results and failed lookups are shown explicitly without synthetic fallback facilities.
 
+Lookups use global Overpass instances (Private.coffee, FOSSGIS and VK Maps). The former Switzerland-only and Virginia-only fallbacks are excluded even if an older environment configuration still lists them. Queries request `out body center` so nodes retain coordinates and ways/relations include a center. Responses missing coordinates trigger failover rather than a false empty result. Nonempty results are cached for ten minutes; empty results are retried on the next search, including previously cached false negatives. A provider outage may reuse a labelled nonempty result up to 24 hours old.
+
 ## From a report to a contact alert
 
 On Submit Report, **Find the nearest suitable service and prepare a contact alert after saving** is checked by default and can be unchecked before submitting. It uses the incident coordinates for the external lookup. After saving, the incident's Nearby Help tab opens, performs the search, selects the nearest mapped result and prepares a message. The original report is saved even when lookup or preparation fails.

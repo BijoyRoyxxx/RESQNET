@@ -26,10 +26,10 @@ class Settings(BaseSettings):
     match_threshold: float = 0.62
     voice_enabled: bool = False
     whisper_model: str = "small"
-    overpass_url: str = "https://overpass-api.de/api/interpreter"
+    overpass_url: str = "https://overpass.private.coffee/api/interpreter"
     overpass_fallback_urls: list[str] = [
-        "https://overpass.osm.ch/api/interpreter",
-        "https://overpass.maprva.org/api/interpreter",
+        "https://overpass-api.de/api/interpreter",
+        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
     ]
     responder_webhooks: dict[str, str] = {}
     responder_token: SecretStr = SecretStr("")

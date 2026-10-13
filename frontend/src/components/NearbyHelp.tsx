@@ -525,8 +525,8 @@ export function NearbyHelp({
                 found within {result.radius_km} km
               </h3>
               <p>
-                OpenStreetMap has no matching facility mapped near this point.
-                That is a data gap, not confirmation that no service exists.
+                This search returned no matching mapped facilities.
+                It does not confirm that no service exists nearby.
                 Check the coordinates, try a larger radius, or search another
                 map.
               </p>
