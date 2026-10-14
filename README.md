@@ -37,25 +37,177 @@ This is a research demo, not an official emergency service. Nearby lookup depend
 - A reproducible 30-report fictional dataset, 10 incident groups, separately stored labels and an executable evaluation script.
 - Nearby police, fire/rescue and medical lookup using OpenStreetMap; permission-based live browser location, straight-line distances, directions, and persistent contact alerts. Car theft suggests police. External alert delivery requires a specifically authorized station gateway and explicit send consent; no station is connected by default. See [Nearby Help](docs/NEARBY-HELP.md).
 
-## Architecture
+## Tech stack in depth
+
+RESQNET is a Python API and a React single-page application. The same business logic supports a local SQLite workspace and a hosted PostgreSQL deployment. AI inference, voice transcription and external responder delivery are optional integrations, not prerequisites for submitting text reports.
+
+Versions below are **declared dependency versions**, taken from [frontend/package.json](frontend/package.json), [backend/requirements.txt](backend/requirements.txt) and [backend/requirements-voice.txt](backend/requirements-voice.txt). Frontend ranges are resolved by `package-lock.json`; this table does not establish which versions are currently running on Render.
+
+| Layer | Technology | Role in this repository |
+| --- | --- | --- |
+| Browser application | React `^19.1.0`, React DOM `^19.1.0`, TypeScript `~5.8.3` | Typed user, administrator and department interfaces; forms, case conversations, incident review and dashboard state. |
+| Frontend build | Vite `^8.3.4`, React Vite plugin, Node 24 | Development server proxies `/api` to FastAPI; production builds compile TypeScript and generate static assets, with separate map and chart chunks. |
+| Styling and UI | Tailwind CSS `^4.1.7`, custom CSS, Radix Slot, class-variance-authority, clsx, tailwind-merge, Lucide React | Utility styles, portal layouts, reusable button variants, class composition and icons. The repository contains a shadcn-style button, not a dependency on a complete shadcn component package. |
+| Maps and charts | Leaflet `^1.9.4`, React Leaflet `^5.0.0`, Recharts `^3.10.1` | Geographic incident/case views and database-derived dashboard charts. OpenStreetMap supplies online map tiles. |
+| API runtime | Python 3.12, FastAPI `0.143.0`, Starlette `1.7.0`, Uvicorn `0.54.0` | REST endpoints, middleware, authenticated event streams and ASGI serving. FastAPI also exposes OpenAPI documentation at `/docs`. |
+| Validation and configuration | Pydantic `2.14.0`, pydantic-settings `2.15.0`, python-multipart `0.0.32` | Request/output schemas, environment settings with the `RESQ_` prefix, and multipart uploads. |
+| Persistence | SQLAlchemy `2.1.4`, SQLite; PostgreSQL via psycopg `3.2.6` | ORM models, transaction scopes and database queries. SQLite is the local default; the README documents Supabase PostgreSQL for the hosted app. |
+| Report intelligence | Ollama with configurable Gemma, Python keyword rules, RapidFuzz `3.14.6` | Optional local structured extraction, deterministic fallback, lexical matching and explained review priority. No embedding model or vector database is used. |
+| Media | Pillow `12.3.0`; optional PyAV `16.0.1` and Faster-Whisper `1.2.1` | Image validation/re-encoding, recording validation and optional CPU transcription. Media bytes use local files or private Supabase Storage through HTTP. |
+| External HTTP | HTTPX `0.28.1` | Calls Ollama, Overpass, Supabase Storage and explicitly configured HTTPS responder gateways. |
+| Verification | pytest, Ruff, mypy, Vitest, Testing Library, ESLint, Playwright, pip-audit | Backend tests/static checks, frontend component checks, browser journeys and manual dependency-audit commands. |
+| Packaging and hosting | Docker, Docker Compose, Nginx, GitHub Actions; documented Render deployment | Combined hosted image or separate local API/frontend containers; CI verifies backend and frontend changes. |
+
+### Frontend and live state
+
+[PortalApp.tsx](frontend/src/PortalApp.tsx) handles session restoration and portal selection. [App.tsx](frontend/src/App.tsx) provides the operations dashboard; components implement submission, review, evidence, nearby help and department case work. [api.ts](frontend/src/api.ts) uses the browser Fetch API with same-origin cookies, a CSRF header and normalized error messages.
+
+Live updates use **Server-Sent Events (SSE)** through `EventSource("/api/live")`, not WebSockets. The backend emits small `ready`/`update` notifications, and the frontend refreshes authorized data through REST. Events do not contain report bodies. [live.py](backend/live.py) keeps bounded subscriber queues in process memory, so multiple API workers would need a shared event broker to notify all clients consistently.
+
+### API, access control and persistence
+
+[main.py](backend/main.py) assembles report, incident, matching, media, analytics and nearby-service endpoints. [portal.py](backend/portal.py) handles cases, messages and department accounts. [auth.py](backend/auth.py) uses Python's `hashlib.scrypt` for password hashes and opaque cookie sessions whose token hashes are stored in the database. Write requests check session CSRF tokens; cookie security is configurable with `RESQ_SECURE_COOKIES`. Server-side ownership and role checks control report/media access and department case scope. Supabase is used for database/storage infrastructure, not Supabase Auth.
+
+[db.py](backend/db.py) separates source reports, extraction results, incidents, associations and match suggestions. Additional tables preserve reviews, audit events, accounts, sessions, cases, messages, media ownership, service searches and responder alerts. A case belongs to a report; an incident can group several reports after human approval. These are distinct workflows, not interchangeable status records.
+
+Database sessions commit successful operations and roll back exceptions. Report idempotency keys are scoped to the account and paired with a payload hash: repeating the same request returns the existing report, while changing its payload under the same key returns a conflict. Case updates use version-checked writes to reject stale edits. Local SQLite enables foreign keys and WAL; hosted PostgreSQL uses the same ORM through psycopg. Startup creates missing tables and applies the repository's department-routing migration helper; there is no Alembic migration framework.
+
+### Extraction, matching and priority
+
+[intelligence.py](backend/intelligence.py) sends report JSON to Ollama's `/api/chat` with the Pydantic extraction schema, temperature zero and a non-streaming response. The default model is `gemma3:1b`. Returned JSON must validate, and evidence spans must be exact source substrings. Safety-sensitive counts and flags are reconciled with conservative rule extraction; model summaries/categories remain unverified interpretations.
+
+`RESQ_AI_MODE=rules` skips inference. Both `auto` and `ollama` can fall back to English/Bengali/Hindi keyword rules when inference fails or output is rejected. The stored extraction engine and latency describe what actually ran. The hosted configuration documented above uses rules; Gemma is a local optional capability.
+
+Matching combines Haversine distance, category equality, RapidFuzz token-set overlap and observation-time proximity. Missing inputs contribute zero. [service.py](backend/service.py) compares against existing active incidents and stores suggestions above the configured threshold, while always creating a separate incident for a new report. A human must approve linking. Priority is a separate rules-based calculation with source references and conflict notes; it is not model confidence or validated medical triage.
+
+### Media, location and external services
+
+[media.py](backend/media.py) verifies image formats, applies orientation, resizes and re-encodes clean JPEG pixels to discard embedded image metadata. The upload limit is 10 MB. Recording validation requires the optional PyAV dependency. Faster-Whisper uses the configured multilingual model (default `small`) on CPU with int8, voice activity detection and a lock that allows one transcription at a time. Users must check/edit transcripts before report submission. Images are supporting evidence; no vision model analyzes them.
+
+Browser geolocation is permission-based. [responders.py](backend/responders.py) queries Overpass for nearby OpenStreetMap facilities, normalizes contact details and uses straight-line Haversine distances. Facility records and phone numbers are map data, not verified availability. Preparing an alert stores a contact handoff without sending it. External sending requires explicit consent, a non-synthetic report and an operator-configured HTTPS endpoint for that facility. Gateway acceptance does not establish station acknowledgment or emergency response.
+
+### Build and verification boundaries
+
+The root [Dockerfile](Dockerfile) builds frontend assets with Node 24, copies them into a Python 3.12 image and runs [cloud.py](backend/cloud.py), which serves both the API and static frontend from one origin. [docker-compose.yml](docker-compose.yml) instead runs FastAPI and an Nginx frontend separately, with a persistent SQLite/media volume and loopback-bound ports.
+
+[GitHub Actions](.github/workflows/tests.yml) runs backend pytest, Ruff, mypy and evaluation, plus frontend lint, unit tests and a production build. Playwright browser tests and dependency audits are available separately; the workflow does not currently run them. See [verification notes](docs/VERIFICATION.md) for recorded checks and their limits.
+
+## Architecture and flow diagrams
+
+These diagrams describe the checked-in implementation. The hosted infrastructure follows the deployment settings documented in this README; optional integrations are labeled explicitly.
+
+### System architecture
 
 ```mermaid
-flowchart LR
-    UI[React + TypeScript + Vite] --> API[FastAPI / Pydantic]
-    API --> SQL[(SQLite / SQLAlchemy)]
-    API --> AI[Gemma via Ollama]
-    AI --> V[Schema + source validation]
-    API --> R[Labeled rule fallback]
-    V --> M[Explainable matching + priority rules]
-    R --> M
-    M --> H[Human review]
-    H --> SQL
-    API --> W[Optional Faster-Whisper CPU]
-    API --> F[Validated local media]
-    SQL --> UI
+flowchart TD
+    Browser["React portals: user, admin, department"]
+    Browser -->|"REST + cookie session + CSRF"| API["FastAPI / Uvicorn"]
+    API --> ORM["SQLAlchemy"]
+    ORM --> LocalDB[("Local SQLite")]
+    ORM --> HostedDB[("Hosted Supabase PostgreSQL")]
+    API --> Media["Media validation and storage adapter"]
+    Media --> LocalFiles["Local runtime/media"]
+    Media --> HostedFiles["Private Supabase Storage"]
+    API --> Intelligence["Extraction, matching and priority"]
+    Intelligence --> Rules["Deterministic rules"]
+    Intelligence -.->|"Optional"| Ollama["Local Ollama / Gemma"]
+    API -.->|"Optional transcription"| Whisper["CPU Faster-Whisper"]
+    API --> Nearby["Nearby service lookup"]
+    Nearby --> Overpass["OpenStreetMap / Overpass"]
+    API --> Events["In-process SSE notifications"]
+    Events -->|"Refetch authorized REST data"| Browser
 ```
 
-SQLAlchemy models cover reports, incidents, report associations, extraction results, match suggestions, media, reviews and audit events. UUIDs, foreign keys, unique request keys, indexes, SQLite WAL and transaction scopes protect local state. The filesystem stores only normalized images and validated audio. No paid service is required.
+SQLite/local files and PostgreSQL/private storage are configuration alternatives, not mirrored replicas. In local development Vite proxies API requests; the hosted container serves built assets directly.
+
+### Report submission and extraction
+
+```mermaid
+flowchart TD
+    Input["Text + optional coordinates / media"] --> Validate["Authenticate, validate input and media ownership"]
+    Validate --> Key{"Existing idempotency key?"}
+    Key -->|"Same payload"| Existing["Return existing report"]
+    Key -->|"Different payload"| Conflict["409 conflict"]
+    Key -->|"New request"| Mode{"Rules mode?"}
+    Mode -->|"Yes"| Rules["Keyword extraction"]
+    Mode -->|"No"| Model["Ollama schema-constrained JSON"]
+    Model --> Check{"Schema and source checks pass?"}
+    Check -->|"Yes"| Grounded["Reconcile source-sensitive fields"]
+    Check -->|"No / inference failure"| Rules
+    Grounded --> Compare["Compare with active incidents"]
+    Rules --> Compare
+    Compare --> Save["Save report, extraction, suggestions and separate incident"]
+    Save --> Case["Create report case and department route"]
+    Case --> Commit["Commit transaction and notify portals"]
+```
+
+Invalid model output can receive one retry before fallback. Engine/latency and uncertainty are stored with extraction. Submitting a report does not automatically merge incidents or contact responders.
+
+### Human review of related reports
+
+```mermaid
+flowchart TD
+    Suggestion["Pending match with score contributions"] --> Review["Administrator inspects source reports and evidence"]
+    Review --> Decision{"Approve or reject?"}
+    Decision -->|"Reject with reason"| Rejected["Record rejection; keep incidents separate"]
+    Decision -->|"Approve with reason"| Guard{"Still pending and target active?"}
+    Guard -->|"No"| Conflict["409 conflict; refresh queue"]
+    Guard -->|"Yes"| Link["Move report association to target incident"]
+    Link --> Cleanup["Close empty source incident; supersede other suggestions"]
+    Cleanup --> History["Record review and audit history"]
+    Rejected --> History
+    History --> Commit["Commit and refresh affected views"]
+```
+
+Manual incident merging and report separation are also available. Linking reports changes the grouping, not the independence or truth of their sources.
+
+### Case routing and live portal updates
+
+```mermaid
+sequenceDiagram
+    participant User as User portal
+    participant API as FastAPI
+    participant DB as Database
+    participant Dept as Department portal
+    participant Admin as Administrator portal
+    User->>API: Submit report with optional category
+    API->>DB: Save report, incident and routed case
+    API-->>User: Saved report
+    API-->>Dept: SSE update notification
+    Dept->>API: Fetch department cases with session
+    API->>DB: Query cases in this department
+    API-->>Dept: Authorized case list
+    Admin->>API: Change category/status with version and note
+    API->>DB: Version-checked case update, message and audit
+    API-->>Admin: Updated case or 409 conflict
+    API-->>Dept: SSE update notification on success
+    API-->>User: SSE update notification on success
+    User->>API: Fetch own reports and messages
+    API-->>User: Authorized case state
+```
+
+Initial routing uses the submitted category when present, otherwise the extracted type. Administrator recategorization updates department routing. Fire routes to Fire & Rescue, medical to Health, flood to Disaster Management, infrastructure to Municipal Services, women's safety to Women's Safety, and crime/unknown to Police. Department routing is an internal access rule; it does not enroll or notify real emergency agencies.
+
+### Nearby help and optional gateway handoff
+
+```mermaid
+flowchart TD
+    Location["Saved incident coordinates"] --> Query["Query Overpass for service facilities"]
+    Query --> Available{"Lookup succeeds?"}
+    Available -->|"No"| Unavailable["Show unavailable; no confirmed facility result"]
+    Available -->|"Yes"| List["Show facilities, map contacts and distances"]
+    List --> Choose["User chooses facility from saved search"]
+    Choose --> Prepare["Validate search freshness/location; persist prepared_not_sent"]
+    Prepare --> Send{"Explicit send consent?"}
+    Send -->|"No"| Handoff["Keep contact handoff; no gateway request"]
+    Send -->|"Yes"| Allowed{"Non-synthetic + configured HTTPS gateway?"}
+    Allowed -->|"No"| Blocked["Reject send; no gateway request"]
+    Allowed -->|"Yes"| Claim["Commit single sending claim"]
+    Claim --> HTTP["Send HTTP POST with alert idempotency key"]
+    HTTP --> Result["Persist delivered_to_gateway, rejected_by_gateway or delivery_unknown"]
+```
+
+A delivery attempt is claimed before network I/O to prevent duplicate attempts. Network failure leaves delivery uncertain; a successful gateway HTTP response is not proof of dispatch.
 
 ```text
 backend/           API, models, extraction, matching, priority, media validation
