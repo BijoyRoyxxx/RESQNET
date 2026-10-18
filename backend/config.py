@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     whisper_model: str = "small"
     overpass_url: str = GLOBAL_OVERPASS_URLS[0]
     overpass_fallback_urls: list[str] = GLOBAL_OVERPASS_URLS[1:]
+    nearby_facility_directory_path: str = str(
+        Path(__file__).resolve().parents[1] / "data/nearby-facilities.json.gz"
+    )
     responder_webhooks: dict[str, str] = {}
     responder_token: SecretStr = SecretStr("")
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]

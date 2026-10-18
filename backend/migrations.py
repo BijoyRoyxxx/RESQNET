@@ -53,3 +53,17 @@ def upgrade_department_routing(engine: Engine) -> None:
             elif case.department != department:
                 case.department = department
         db.commit()
+
+
+def upgrade_nearby_sources(engine: Engine) -> None:
+    """Record when a nearby result came from the bundled offline snapshot."""
+    with engine.begin() as connection:
+        if "service_searches" not in inspect(connection).get_table_names():
+            return
+        columns = {item["name"] for item in inspect(connection).get_columns("service_searches")}
+        if "source" not in columns:
+            connection.execute(
+                text("ALTER TABLE service_searches ADD COLUMN source VARCHAR(40) NOT NULL DEFAULT 'overpass'")
+            )
+        if "source_updated_at" not in columns:
+            connection.execute(text("ALTER TABLE service_searches ADD COLUMN source_updated_at VARCHAR(40)"))

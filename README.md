@@ -20,7 +20,7 @@ A local disaster-report workspace with user, administrator and department portal
 - **Deploy updates:** Push to `main`; Render automatically builds and deploys the commit. Database URLs, storage keys and bootstrap passwords stay in Render's environment settings, never in this repository.
 - **Free-tier behavior:** Render may spin the service down while idle, so the first request after a pause can take longer.
 
-This is a research demo, not an official emergency service. Nearby lookup depends on public map providers and can be temporarily unavailable.
+This is a research demo, not an official emergency service. Nearby lookup tries public Overpass providers first. If they are down, the app can show a dated OpenStreetMap regional snapshot; snapshot results are labelled, may be out of date, and cannot be used to prepare an alert.
 
 ## What works
 

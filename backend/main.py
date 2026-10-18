@@ -42,7 +42,7 @@ from backend.departments import department_for_category
 from backend.limits import RequestSizeLimit
 from backend.live import updates
 from backend.media import delete_media, read_media, store_upload, transcribe
-from backend.migrations import upgrade_department_routing
+from backend.migrations import upgrade_department_routing, upgrade_nearby_sources
 from backend.portal import router as portal_router
 from backend.responders import alert_dict, prepare_alert, search_services, send_alert
 from backend.schemas import (
@@ -78,6 +78,7 @@ logger = logging.getLogger("resq.api")
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(engine)
     upgrade_department_routing(engine)
+    upgrade_nearby_sources(engine)
     bootstrap_admin()
     yield
 

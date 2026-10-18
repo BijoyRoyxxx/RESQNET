@@ -1,7 +1,11 @@
+import gzip
+import json
 import logging
 import re
 import time
 from datetime import timedelta, timezone
+from functools import lru_cache
+from pathlib import Path
 from threading import Lock
 from urllib.parse import urlparse
 
@@ -100,6 +104,36 @@ def facility_rows(elements: list, lat: float, lon: float, radius: int) -> list[d
     return sorted(found.values(), key=lambda x: (x["distance_km"], x["id"]))[:12]
 
 
+@lru_cache(maxsize=1)
+def facility_directory() -> dict | None:
+    path = Path(settings.nearby_facility_directory_path)
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as stream:
+            directory = json.load(stream)
+        if not isinstance(directory.get("elements"), list) or not directory.get("snapshot_at"):
+            return None
+        return directory
+    except (OSError, ValueError, TypeError):
+        logger.exception("Nearby facility snapshot could not be loaded")
+        return None
+
+
+def directory_rows(directory: dict, service: str, lat: float, lon: float, radius: int) -> list[dict]:
+    bounds = directory.get("bounds", {})
+    if not (
+        bounds.get("south", -90) <= lat <= bounds.get("north", 90)
+        and bounds.get("west", -180) <= lon <= bounds.get("east", 180)
+    ):
+        return []
+    selectors = [selector.strip("[]").split("=") for selector in SERVICE_TAGS[service]]
+    elements = [
+        element
+        for element in directory["elements"]
+        if any(element.get("tags", {}).get(key.strip('"')) == value.strip('"') for key, value in selectors)
+    ]
+    return facility_rows(elements, lat, lon, radius)
+
+
 def search_services(db: Session, payload: NearbyInput) -> dict:
     suggested, reason = recommended_service(payload.text, payload.category)
     service = suggested if payload.service == "auto" else payload.service
@@ -124,7 +158,8 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
     recent = existing is not None and existing.created_at.replace(tzinfo=timezone.utc) >= now() - timedelta(
         minutes=10
     )
-    cached, stale = recent, False
+    cached = recent
+    stale = bool(existing and existing.source == "offline_snapshot")
     if not recent:
         # Release the database connection while a public map server is working.
         db.commit()
@@ -183,10 +218,29 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
             if existing and existing.facilities:
                 cached, stale = True, True
             else:
-                raise HTTPException(
-                    503,
-                    "Nearby map providers are temporarily unavailable. Try again shortly or open a map search. No station was contacted.",
-                )
+                directory = facility_directory()
+                if directory:
+                    facilities = directory_rows(
+                        directory, service, payload.latitude, payload.longitude, payload.radius_km
+                    )
+                    facilities = [dict(facility) for facility in facilities]
+                    existing = ServiceSearch(
+                        latitude=payload.latitude,
+                        longitude=payload.longitude,
+                        service=service,
+                        radius_km=payload.radius_km,
+                        facilities=facilities,
+                        source="offline_snapshot",
+                        source_updated_at=directory["snapshot_at"],
+                    )
+                    db.add(existing)
+                    db.flush()
+                    cached, stale = True, True
+                else:
+                    raise HTTPException(
+                        503,
+                        "Nearby map providers and the offline facility directory are unavailable. No station was contacted.",
+                    )
         else:
             existing = ServiceSearch(
                 latitude=payload.latitude,
@@ -194,6 +248,8 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
                 service=service,
                 radius_km=payload.radius_km,
                 facilities=facilities,
+                source="overpass",
+                source_updated_at=None,
             )
             db.add(existing)
             db.flush()
@@ -205,7 +261,17 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
         "suggested_service": suggested,
         "routing_reason": reason,
         "distance_method": "straight_line",
-        "source": "OpenStreetMap / Overpass",
+        "source": (
+            "OpenStreetMap / Geofabrik regional snapshot"
+            if existing.source == "offline_snapshot"
+            else "OpenStreetMap / Overpass"
+        ),
+        "snapshot_at": existing.source_updated_at,
+        "source_url": (
+            directory["source_url"]
+            if existing.source == "offline_snapshot" and (directory := facility_directory())
+            else None
+        ),
         "facilities": [
             {**f, "connected": f["id"] in settings.responder_webhooks} for f in existing.facilities
         ],
@@ -224,6 +290,11 @@ def prepare_alert(db: Session, report_id: str, payload: AlertInput) -> dict:
     if now() - created > timedelta(minutes=15):
         raise HTTPException(
             409, "Search results expired. Find nearby services again before preparing an alert."
+        )
+    if search.source == "offline_snapshot":
+        raise HTTPException(
+            409,
+            "This facility came from an offline map snapshot. Confirm it directly before preparing an alert.",
         )
     facility = next((f for f in search.facilities if f["id"] == payload.facility_id), None)
     if facility is None:

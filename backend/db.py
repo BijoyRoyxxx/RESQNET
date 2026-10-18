@@ -127,6 +127,8 @@ class ServiceSearch(Record, Base):
     service: Mapped[str] = mapped_column(String(20))
     radius_km: Mapped[int] = mapped_column(Integer)
     facilities: Mapped[list] = mapped_column(JSON)
+    source: Mapped[str] = mapped_column(String(40), default="overpass")
+    source_updated_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
 
 class ResponderAlert(Record, Base):

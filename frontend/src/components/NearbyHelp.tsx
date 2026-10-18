@@ -46,6 +46,9 @@ export interface NearbyResult {
   notice: string;
   cached: boolean;
   stale?: boolean;
+  source?: string;
+  source_url?: string | null;
+  snapshot_at?: string | null;
   created_at: string;
 }
 export interface ResponderAlert {
@@ -195,7 +198,9 @@ export function NearbyHelp({
         setResult(found);
         if (found.stale)
           setNote(
-            "Map providers are unavailable. Showing a previously saved lookup; details may have changed. Search again before preparing an alert.",
+            found.snapshot_at
+              ? `Live map providers are unavailable. Showing OpenStreetMap facilities from ${new Date(found.snapshot_at).toLocaleDateString()}; details may have changed. Confirm by phone before relying on a facility.`
+              : "Map providers are unavailable. Showing a previously saved lookup; details may have changed. Confirm by phone before relying on a facility.",
           );
         setSelectedId(found.facilities[0]?.id || "");
         if (found.facilities[0]) onSelection?.(found, found.facilities[0]);
@@ -798,7 +803,15 @@ export function NearbyHelp({
             </div>
           )}
           <p className="nearby-provenance">
-            {result.notice} Source: OpenStreetMap / Overpass ·{" "}
+            {result.notice} Source: {" "}
+            {result.source_url ? (
+              <a href={result.source_url} target="_blank" rel="noreferrer">
+                {result.source ?? "OpenStreetMap"}
+              </a>
+            ) : (
+              (result.source ?? "OpenStreetMap / Overpass")
+            )}{" "}
+            ·{" "}
             {result.cached ? "Cached lookup" : "Fresh lookup"} ·{" "}
             {new Date(
               result.created_at.endsWith("Z") ||
