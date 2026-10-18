@@ -156,13 +156,57 @@ def test_lookup_sorts_caches_and_does_not_forward_report_text(client, monkeypatc
     assert first["facilities"][0]["distance_km"] < first["facilities"][1]["distance_km"]
     assert first["distance_method"] == "straight_line"
     assert "stolen" not in calls[0][1]["data"]["data"]
-    assert "[timeout:8]" in calls[0][1]["data"]["data"]
+    assert "[timeout:20]" in calls[0][1]["data"]["data"]
     assert "out body center;" in calls[0][1]["data"]["data"]
     assert "[maxsize:" not in calls[0][1]["data"]["data"]
     assert "around:10000," in calls[0][1]["data"]["data"]
-    assert calls[0][1]["timeout"] == 12
+    assert calls[0][1]["timeout"].connect == 5
     assert search(client)["cached"] is True
     assert len(calls) == 1
+
+
+def test_slow_global_fallback_can_finish_and_cache_a_real_station(client, monkeypatch):
+    from backend.config import GLOBAL_OVERPASS_URLS
+
+    monkeypatch.setattr(settings, "overpass_url", GLOBAL_OVERPASS_URLS[0])
+    monkeypatch.setattr(settings, "overpass_fallback_urls", GLOBAL_OVERPASS_URLS[1:])
+    calls = []
+
+    def post(url, **kwargs):
+        calls.append(url)
+        request = httpx.Request("POST", url)
+        if url != GLOBAL_OVERPASS_URLS[-1]:
+            return httpx.Response(503, request=request)
+        # The production query completed after 16 seconds; another took 24.
+        timeout = kwargs["timeout"]
+        if (timeout.read if isinstance(timeout, httpx.Timeout) else timeout) < 24:
+            raise httpx.ReadTimeout("Provider still processing", request=request)
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "elements": [
+                    {
+                        "type": "node",
+                        "id": 1579176040,
+                        "lat": 22.4424481,
+                        "lon": 88.4305142,
+                        "tags": {"amenity": "police", "name": "Sonarpur Police Station"},
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr("backend.responders.httpx.post", post)
+    payload = {"latitude": 22.403540, "longitude": 88.484965, "service": "police", "radius_km": 10}
+    response = client.post("/api/services/nearby", json=payload)
+    assert response.status_code == 200
+    station = response.json()["facilities"][0]
+    assert station["name"] == "Sonarpur Police Station"
+    assert 7 < station["distance_km"] < 8
+    assert calls == GLOBAL_OVERPASS_URLS
+    assert client.post("/api/services/nearby", json=payload).json()["cached"] is True
+    assert len(calls) == 3
 
 
 def test_empty_cache_is_refetched_after_regional_provider_fix(client, monkeypatch):

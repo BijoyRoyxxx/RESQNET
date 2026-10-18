@@ -132,7 +132,7 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
         selectors = "".join(f"nwr{tag}({center});" for tag in SERVICE_TAGS[service])
         if len(SERVICE_TAGS[service]) > 1:
             selectors = f"({selectors});"
-        query = f"[out:json][timeout:8];{selectors}out body center;"
+        query = f"[out:json][timeout:20];{selectors}out body center;"
         facilities = None
         providers = [
             provider
@@ -149,8 +149,9 @@ def search_services(db: Session, payload: NearbyInput) -> dict:
                 response = httpx.post(
                     provider,
                     data={"data": query},
-                    timeout=12,
-                    headers={"User-Agent": "RESQNET/1.2 (+https://github.com/BijoyRoyxxx/RESQNET)"},
+                    # Allow provider queueing as well as the query's execution budget.
+                    timeout=httpx.Timeout(35, connect=5),
+                    headers={"User-Agent": "RESQNET/1.3 (+https://github.com/BijoyRoyxxx/RESQNET)"},
                 )
                 response.raise_for_status()
                 result = response.json()
